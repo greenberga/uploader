@@ -20,6 +20,7 @@ PASSWORD = environ.get('MG_PASS')
 MG_API_KEY = environ.get('MG_API_KEY')
 DRY = environ.get('DRY')
 AUTH = ('api', MG_API_KEY)
+BLOG_DOMAIN = environ.get('BLOG_DOMAIN')
 
 ORIENTATIONS = [
     None,
@@ -36,9 +37,8 @@ ORIENTATIONS = [
 TEMP_PATH = '/tmp'
 
 BUCKET = environ.get('AWS_BUCKET')
-s3 = boto3.resource('s3')
-
-git = Repo('blog').git
+s3 = None
+git = None
 
 
 class UploaderError(Exception):
@@ -158,6 +158,24 @@ def upload_files(*file_paths):
                 s3.Object(BUCKET, file_name).put(Body = f, ACL = 'public-read')
 
 
+def format_summary(summary, convert_links = True):
+    """
+    Formats a summary string, sanitizing special HTML characters and optionally
+    converting link patterns into actual anchor tags.
+    """
+
+    if not summary: return ''
+
+    summary = html.escape(summary)
+    if convert_links:
+        summary = re.sub(
+            r'(^|\s)/(\d+)',
+            '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(BLOG_DOMAIN),
+            summary,
+        )
+    return '<span>{}</span>'.format(summary)
+
+
 def make_post(oid, date, contents, summary):
     """
     Writes a Jekyll markdown post into the blog's _posts directory.
@@ -183,8 +201,7 @@ def make_post(oid, date, contents, summary):
 
     new_post_file_name = 'blog/_posts/{0}-{1}.md'.format(str(today), oid)
 
-    if summary:
-        summary = '\n  <span>{0}</span>'.format(html.escape(summary))
+    summary = format_summary(summary)
 
     post_contents = r'''---
 layout: post
@@ -269,7 +286,7 @@ def make_image_post(oid, summary, path):
     img += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
     img += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
     if summary:
-        img += 'alt="{}" '.format(html.escape(summary))
+        img += 'alt="{}" '.format(format_summary(summary, False))
     img += '/>'
 
     # Create the blog post and write it in the directory.
@@ -328,5 +345,10 @@ def upload():
 
 
 if __name__ == '__main__':
+
+    # Initialize connection to AWS S3 and load the Git Repository object.
+    s3 = boto3.resource('s3')
+    git = Repo('blog').git
+
     log('Starting server')
     run(host = '0.0.0.0', port = 5678)
