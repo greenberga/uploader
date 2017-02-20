@@ -1,0 +1,6 @@
+blog
+.env
+venv
+*.log
+emails.json
+latest.txt

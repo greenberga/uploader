@@ -1,0 +1,13 @@
+GitPython==2.0.8
+Pillow==3.4.0
+boto3==1.4.0
+botocore==1.4.58
+bottle==0.12.9
+docutils==0.12
+gitdb==0.6.4
+jmespath==0.9.0
+python-dateutil==2.5.3
+requests==2.11.1
+s3transfer==0.1.5
+six==1.10.0
+smmap==0.9.0
