@@ -4,3 +4,4 @@ venv
 *.log
 emails.json
 latest.txt
+__pycache__
