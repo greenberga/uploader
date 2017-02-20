@@ -5,3 +5,4 @@ venv
 emails.json
 latest.txt
 __pycache__
+*.pyc
