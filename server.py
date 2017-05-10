@@ -158,21 +158,19 @@ def upload_files(*file_paths):
                 s3.Object(BUCKET, file_name).put(Body = f, ACL = 'public-read')
 
 
-def format_summary(summary, convert_links = True):
+def format_summary(summary):
     """
-    Formats a summary string, sanitizing special HTML characters and optionally
+    Formats a summary string, sanitizing special HTML characters and
     converting link patterns into actual anchor tags.
     """
 
     if not summary: return ''
-
     summary = html.escape(summary)
-    if convert_links:
-        summary = re.sub(
-            r'(^|\s)/(\d+)',
-            '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(BLOG_DOMAIN),
-            summary,
-        )
+    summary = re.sub(
+        r'(^|\W)/(\d+)',
+        '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(BLOG_DOMAIN),
+        summary,
+    )
     return '<span>{}</span>'.format(summary)
 
 
@@ -286,7 +284,7 @@ def make_image_post(oid, summary, path):
     img += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
     img += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
     if summary:
-        img += 'alt="{}" '.format(format_summary(summary, False))
+        img += 'alt="{}" '.format(html.escape(summary))
     img += '/>'
 
     # Create the blog post and write it in the directory.
