@@ -15,24 +15,26 @@ def test_format_summary():
     s = 'Pic of Joe, see /644'
     e = '<span>Pic of Joe, see <a href="http://foo.bar/644">/644</a></span>'
     assert format_summary(s) == e
-    assert format_summary(s, convert_links = False) == '<span>' + s + '</span>'
 
     s = 'Cool pic, <3 //6'
-    e = '<span>Cool pic, &lt;3 //6</span>'
+    e = '<span>Cool pic, &lt;3 /<a href="http://foo.bar/6">/6</a></span>'
     assert format_summary(s) == e
-    assert format_summary(s, convert_links = False) == e
 
     s = 'A pic, /s'
     e = '<span>' + s + '</span>'
     assert format_summary(s) == e
-    assert format_summary(s, convert_links = False) == e
 
     s = 'This pic is 10/10!'
     e = '<span>' + s + '</span>'
     assert format_summary(s) == e
-    assert format_summary(s, convert_links = False) == e
 
     s = '/164 is similar'
     e = '<span><a href="http://foo.bar/164">/164</a> is similar</span>'
     assert format_summary(s) == e
-    assert format_summary(s, convert_links = False) == '<span>' + s + '</span>'
+
+    s = '(/322,/333)'
+    e = (
+        '<span>(<a href="http://foo.bar/322">/322</a>,'
+        '<a href="http://foo.bar/333">/333</a>)</span>'
+    )
+    assert format_summary(s) == e
