@@ -1,4 +1,5 @@
 import os
+from nose.tools import ok_
 
 def setup():
     os.environ['BLOG_DOMAIN'] = 'foo.bar'
@@ -12,29 +13,14 @@ def test_format_summary():
 
     from server import format_summary
 
-    s = 'Pic of Joe, see /644'
-    e = '<span>Pic of Joe, see <a href="http://foo.bar/644">/644</a></span>'
-    assert format_summary(s) == e
+    specs = {
+        'Pic of Joe, see /644': '<span>Pic of Joe, see <a href="http://foo.bar/644">/644</a></span>',
+        'Cool pic, <3 //6': '<span>Cool pic, &lt;3 /<a href="http://foo.bar/6">/6</a></span>',
+        'A pic, /s': '<span>A pic, /s</span>',
+        'This pic is 10/10!': '<span>This pic is 10/10!</span>',
+        '/164 is similar': '<span><a href="http://foo.bar/164">/164</a> is similar</span>',
+        '(/322,/333)': '<span>(<a href="http://foo.bar/322">/322</a>,<a href="http://foo.bar/333">/333</a>)</span>',
+    }
 
-    s = 'Cool pic, <3 //6'
-    e = '<span>Cool pic, &lt;3 /<a href="http://foo.bar/6">/6</a></span>'
-    assert format_summary(s) == e
-
-    s = 'A pic, /s'
-    e = '<span>' + s + '</span>'
-    assert format_summary(s) == e
-
-    s = 'This pic is 10/10!'
-    e = '<span>' + s + '</span>'
-    assert format_summary(s) == e
-
-    s = '/164 is similar'
-    e = '<span><a href="http://foo.bar/164">/164</a> is similar</span>'
-    assert format_summary(s) == e
-
-    s = '(/322,/333)'
-    e = (
-        '<span>(<a href="http://foo.bar/322">/322</a>,'
-        '<a href="http://foo.bar/333">/333</a>)</span>'
-    )
-    assert format_summary(s) == e
+    for summary, expected in specs.items():
+        yield ok_, format_summary(summary), expected
