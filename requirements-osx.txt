@@ -1,6 +1,7 @@
 boto3==1.4.0
 botocore==1.4.48
 bottle==0.12.9
+coverage==4.4.1
 docutils==0.12
 gitdb==0.6.4
 GitPython==2.0.8
