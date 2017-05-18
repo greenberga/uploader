@@ -4,17 +4,18 @@ from unittest.mock import patch, mock_open
 
 from nose.tools import ok_
 
-def setup():
-    os.environ['BLOG_DOMAIN'] = 'foo.bar'
-    os.environ['AUTHORIZED_SENDERS_PATTERN'] = 'email@add.rs'
+old_mode = os.environ.get('MODE', None)
+os.environ['MODE'] = 'test'
+
+from server import format_summary, make_post
 
 def teardown():
-    del os.environ['BLOG_DOMAIN']
-    del os.environ['AUTHORIZED_SENDERS_PATTERN']
+    if old_mode:
+        os.environ['MODE'] = old_mode
+    else:
+        del os.environ['MODE']
 
 def test_format_summary():
-
-    from server import format_summary
 
     specs = {
         'Pic of Joe, see /644': '<span>Pic of Joe, see <a href="http://foo.bar/644">/644</a></span>',
@@ -29,8 +30,6 @@ def test_format_summary():
         yield ok_, format_summary(summary), expected
 
 def test_make_post():
-
-    from server import make_post
 
     today = datetime.date.today()
     str_today = str(today)
@@ -85,13 +84,13 @@ layout: post
 
     ]
 
-    for args, xpected_fname, xpected_content in specs:
-        yield check_make_post, make_post, args, xpected_fname, xpected_content
+    for args, expected_filename, expected_content in specs:
+        yield check_make_post, args, expected_filename, expected_content
 
-def check_make_post(make_post, args, xpected_fname, xpected_content):
+def check_make_post(args, expected_filename, expected_content):
     m = mock_open()
     with patch(make_post.__module__ + '.open', m, create = True):
         make_post(*args)
-        m.assert_called_once_with(xpected_fname, 'w')
+        m.assert_called_once_with(expected_filename, 'w')
         handle = m()
-        handle.write.assert_called_once_with(xpected_content)
+        handle.write.assert_called_once_with(expected_content)

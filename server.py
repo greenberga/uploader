@@ -2,6 +2,7 @@ import datetime
 import html
 import json
 import re
+from configparser import ConfigParser
 from os import listdir, remove, environ
 from os.path import join, basename
 from sys import stdout, stderr
@@ -14,13 +15,12 @@ from PIL import Image
 from PIL.ExifTags import TAGS as EXIF_TAGS
 from requests.exceptions import RequestException
 
+mode = environ.get('MODE', 'prod')
+config = ConfigParser()
+config.read('config.ini')
+config = config[mode]
 
-USERNAME = environ.get('MG_USER')
-PASSWORD = environ.get('MG_PASS')
-MG_API_KEY = environ.get('MG_API_KEY')
 DRY = environ.get('DRY')
-AUTH = ('api', MG_API_KEY)
-BLOG_DOMAIN = environ.get('BLOG_DOMAIN')
 
 ORIENTATIONS = [
     None,
@@ -35,11 +35,6 @@ ORIENTATIONS = [
 ]
 
 TEMP_PATH = '/tmp'
-
-BUCKET = environ.get('AWS_BUCKET')
-s3 = None
-git = None
-
 
 class UploaderError(Exception):
     pass
@@ -57,7 +52,7 @@ def log_err(msg, err):
     raise UploaderError
 
 
-AUTHORIZED_SENDERS = re.compile(environ.get('AUTHORIZED_SENDERS_PATTERN'))
+authorized_senders = re.compile(config['authorized-senders-pattern'])
 
 def is_authorized():
     sender = request.forms.get('from')
@@ -91,7 +86,8 @@ def download_attachment(url, save_path):
     """
 
     try:
-        response = requests.get(url, auth = AUTH, stream = True)
+        auth = ( 'api', config['mailgun-key'] )
+        response = requests.get(url, auth = auth, stream = True)
         response.raise_for_status()
         with open(save_path, 'wb') as f:
             for chunk in response:
@@ -153,9 +149,10 @@ def upload_files(*file_paths):
     for path in file_paths:
         file_name = basename(path)
         log('Uploading {0} to Amazon S3'.format(path))
+        bucket = config['aws-bucket']
         if not DRY:
             with open(path, 'rb') as f:
-                s3.Object(BUCKET, file_name).put(Body = f, ACL = 'public-read')
+                s3.Object(bucket, file_name).put(Body = f, ACL = 'public-read')
 
 
 def format_summary(summary):
@@ -168,7 +165,7 @@ def format_summary(summary):
     summary = html.escape(summary)
     summary = re.sub(
         r'(^|\W)/(\d+)',
-        '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(BLOG_DOMAIN),
+        '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(config['domain']),
         summary,
     )
     return '<span>{}</span>'.format(summary)
