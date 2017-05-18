@@ -6,3 +6,6 @@ emails.json
 latest.txt
 __pycache__
 *.pyc
+cover/
+.coverage
+config.ini
