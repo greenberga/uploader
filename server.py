@@ -56,7 +56,7 @@ authorized_senders = re.compile(config['authorized-senders-pattern'])
 
 def is_authorized():
     sender = request.forms.get('from')
-    return AUTHORIZED_SENDERS.match(sender) is not None
+    return authorized_senders.match(sender) is not None
 
 
 def parse_attachment(attachment):
