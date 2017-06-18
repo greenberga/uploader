@@ -1,6 +1,6 @@
 blog
 .env
-venv
+*venv
 *.log
 emails.json
 latest.txt
