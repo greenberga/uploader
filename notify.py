@@ -1,13 +1,19 @@
+#!/home/aaron/uploader/.venv/bin/python
+
 import json
 from os import environ, listdir, path
+from configparser import ConfigParser
 
 import requests
 
 DRY = environ.get('DRY')
-MG_URL = environ.get('MG_NOTIFICATIONS_URL')
-MG_API_KEY = environ.get('MG_API_KEY')
-AUTH = ('api', MG_API_KEY)
+
 UPLOADER_DIR = path.dirname(path.realpath(__file__))
+
+mode = environ.get('MODE', 'prod')
+config = ConfigParser()
+config.read(path.join(UPLOADER_DIR, 'config.ini'))
+config = config[mode]
 
 def compute_new_post_count():
 
@@ -29,23 +35,42 @@ def compute_new_post_count():
 
 def send_update(recipient, new_count):
 
-    has, post, it = ('has', 'post', 'it') if new_count == 1 else ('have', 'posts', 'them')
+    if new_count == 1:
+        has, post, it = ('has', 'post', 'it')
+    else:
+        has, post, it = ('have', 'posts', 'them')
 
     address = recipient['address']
-    text_content = recipient['text'].format(n = new_count, has = has, post = post, it = it)
-    html_content = recipient['html'].format(n = new_count, has = has, post = post, it = it)
+    text_content = recipient['text'].format(
+        n = new_count,
+        has = has,
+        post = post,
+        it = it,
+    )
+    html_content = recipient['html'].format(
+        n = new_count,
+        has = has,
+        post = post,
+        it = it,
+    )
 
     data = {
         'to': address,
-        'from': environ.get('MG_FROM'),
-        'subject': 'New photos on {}'.format(environ.get('BLOG_DOMAIN')),
+        'from': config['mailgun-from'],
+        'subject': 'New photos on {}'.format(config['domain']),
         'text': text_content,
         'html': html_content,
-        'h:Reply-To': environ.get('MG_REPLY_TO'),
+        'h:Reply-To': config['mailgun-reply-to'],
     }
 
+    print('Sending update to %s' % address)
+
     if not DRY:
-        response = requests.post(MG_URL, auth = AUTH, data = data)
+        response = requests.post(
+            config['mailgun-notifications-url'],
+            auth = ('api', config['mailgun-key']),
+            data = data,
+        )
         response.raise_for_status()
 
 if __name__ == '__main__':
@@ -58,3 +83,5 @@ if __name__ == '__main__':
 
         for recipient in emails['recipients']:
             send_update(recipient, new_post_count)
+
+        print('Updates sent successfully')
