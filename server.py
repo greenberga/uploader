@@ -2,9 +2,10 @@ import datetime
 import html
 import json
 import re
+from contextlib import contextmanager
 from configparser import ConfigParser
-from os import listdir, remove, environ
-from os.path import join, basename
+from os import listdir, remove, environ, getcwd, chdir
+from os.path import join, basename, dirname, realpath
 from sys import stdout, stderr
 
 import requests
@@ -15,9 +16,19 @@ from PIL import Image
 from PIL.ExifTags import TAGS as EXIF_TAGS
 from requests.exceptions import RequestException
 
+uploader_dirpath = dirname(realpath(__file__))
+rel = lambda f: join(uploader_dirpath, f)
+
+@contextmanager
+def pushd(where):
+    start_dir = getcwd()
+    chdir(where)
+    yield
+    chdir(start_dir)
+
 mode = environ.get('MODE', 'prod')
 config = ConfigParser()
-config.read('config.ini')
+config.read(rel('config.ini'))
 config = config[mode]
 
 DRY = environ.get('DRY')
@@ -97,7 +108,7 @@ def download_attachment(url, save_path):
 
 
 def get_new_oid():
-    posts = listdir('blog/_posts')
+    posts = listdir(rel('blog/_posts'))
     sorted_oids = sorted([ int(p.split('.')[0].split('-')[-1]) for p in posts ])
     return sorted_oids[-1] + 1
 
@@ -194,7 +205,7 @@ def make_post(oid, date, contents, summary):
 
     date = '{d:%B} {d.day}, {d:%Y}'.format(d = date)
 
-    new_post_file_name = 'blog/_posts/{0}-{1}.md'.format(str(today), oid)
+    new_post_file_name = rel('blog/_posts/{0}-{1}.md'.format(str(today), oid))
 
     summary = format_summary(summary)
 
@@ -301,9 +312,10 @@ def update_site(new_post_number):
     log('Uploading blog post #{0}'.format(new_post_number))
 
     if not DRY:
-        git.add('_posts')
-        git.commit('-m', 'Add post {0}'.format(new_post_number))
-        git.push('origin', 'master')
+        with pushd(uploader_dirpath):
+            git.add('_posts')
+            git.commit('-m', 'Add post {0}'.format(new_post_number))
+            git.push('origin', 'master')
 
 
 @post('/upload')
@@ -313,7 +325,8 @@ def upload():
         abort(401)
 
     # Ensure the local blog copy is up to date.
-    git.pull('origin', 'master')
+    with pushd(uploader_dirpath):
+        git.pull('origin', 'master')
 
     try:
 
@@ -343,7 +356,7 @@ if __name__ == '__main__':
 
     # Initialize connection to AWS S3 and load the Git Repository object.
     s3 = boto3.resource('s3')
-    git = Repo('blog').git
+    git = Repo(rel('blog')).git
 
     log('Starting server')
     run(host = '0.0.0.0', port = 5678)
