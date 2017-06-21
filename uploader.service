@@ -1,0 +1,17 @@
+[Unit]
+Description=Photo Uploader Server
+Documentation=https://github.com/ajgreenb/uploader
+
+[Service]
+User=aaron
+Group=aaron
+Restart=on-failure
+ExecStart=/home/aaron/uploader/.venv/bin/python /home/aaron/uploader/server.py
+ExecReload=/bin/kill -1 $MAINPID
+ExecStop=/bin/kill -15 $MAINPID
+PrivateTmp=true
+PrivateUsers=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
