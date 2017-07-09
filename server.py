@@ -1,6 +1,7 @@
 import datetime
 import html
 import json
+import logging
 import re
 from contextlib import contextmanager
 from configparser import ConfigParser
@@ -15,6 +16,11 @@ from git import Repo
 from PIL import Image
 from PIL.ExifTags import TAGS as EXIF_TAGS
 from requests.exceptions import RequestException
+
+logging.basicConfig(
+    format = '[%(levelname)s] %(message)s',
+    level = logging.DEBUG,
+)
 
 uploader_dirpath = dirname(realpath(__file__))
 rel = lambda f: join(uploader_dirpath, f)
@@ -51,18 +57,6 @@ class UploaderError(Exception):
     pass
 
 
-def log(msg):
-    now = datetime.datetime.now().strftime('%D %T')
-    stdout.write('* [ {0} ] {1}\n'.format(now, msg))
-
-
-def log_err(msg, err):
-    now = datetime.datetime.now().strftime('%D %T')
-    stderr.write('X [ {0} ] {1}\n'.format(now, msg))
-    stderr.write('X {}\n'.format(' ' * (5 + len(now)) + str(err)))
-    raise UploaderError
-
-
 authorized_senders = re.compile(config['authorized-senders-pattern'])
 
 def is_authorized():
@@ -81,7 +75,8 @@ def parse_attachment(attachment):
     try:
         attachment = attachment[0]
     except IndexError as e:
-        log_err('Couldn\'t find any attached files', e)
+        logging.exception("Couldn't find any attached files")
+        raise UploaderError
 
     return ( attachment['url'], attachment['name'], attachment['content-type'] )
 
@@ -104,7 +99,8 @@ def download_attachment(url, save_path):
             for chunk in response:
                 f.write(chunk)
     except RequestException as e:
-        log_err('Failed to download attachment \'{}\''.format(url), e)
+        logging.exception('Failed to download attachment \'{}\''.format(url))
+        raise UploaderError
 
 
 def get_new_oid():
@@ -143,13 +139,14 @@ def delete(*paths):
     """
 
     for path in paths:
-        log('Deleting {0}'.format(path))
+        logging.info('Deleting {0}'.format(path))
         if not DRY:
             try:
                 remove(path)
             except OSError as e:
                 err_msg = 'Error while attempting to delete \'{}\''.format(path)
-                log_err(err_msg, e)
+                logging.exception(err_msg)
+                raise UploaderError
 
 
 def upload_files(*file_paths):
@@ -159,7 +156,7 @@ def upload_files(*file_paths):
 
     for path in file_paths:
         file_name = basename(path)
-        log('Uploading {0} to Amazon S3'.format(path))
+        logging.info('Uploading {0} to Amazon S3'.format(path))
         bucket = config['aws-bucket']
         if not DRY:
             with open(path, 'rb') as f:
@@ -194,7 +191,7 @@ def make_post(oid, date, contents, summary):
     summary: A string to be used for the caption of the post.
     """
 
-    log('Writing post #{0}'.format(oid))
+    logging.info('Writing post #{0}'.format(oid))
 
     today = datetime.date.today()
 
@@ -236,13 +233,14 @@ def make_image_post(oid, summary, path):
     path: The path to the original, uploaded image file.
     """
 
-    log('Making image post #{0}'.format(oid))
+    logging.info('Making image post #{0}'.format(oid))
 
     try:
         img = Image.open(path)
     except (FileNotFoundError, OSError) as e:
         err_msg = 'Error while attempting to load \'{}\''.format(path)
-        log_err(err_msg, e)
+        logging.exception(err_msg)
+        raise UploaderError
 
     meta = get_img_data(img)
 
@@ -250,7 +248,7 @@ def make_image_post(oid, summary, path):
     if degree_to_rotate is not None:
         img = img.rotate(degree_to_rotate, expand = True)
 
-    log('Resizing image #{0} ({1})'.format(oid, path))
+    logging.info('Resizing image #{0} ({1})'.format(oid, path))
     width, height = img.size
     larger_dimension = width if width > height else height
     scales = [ x / larger_dimension for x in [ 320.0, 640.0, 960.0, 1280.0 ] ]
@@ -309,7 +307,7 @@ def update_site(new_post_number):
     generating the commit message.)
     """
 
-    log('Uploading blog post #{0}'.format(new_post_number))
+    logging.info('Uploading blog post #{0}'.format(new_post_number))
 
     if not DRY:
         with pushd(uploader_dirpath):
@@ -344,7 +342,8 @@ def upload():
         if file_type.startswith('image'):
             make_image_post(new_oid, summary, path)
         else:
-            log_err('Unsupported file type \'{0}\''.format(file_type))
+            logging.error('Unsupported file type \'{0}\''.format(file_type))
+            raise UploaderError
 
         update_site(new_oid)
 
@@ -358,5 +357,5 @@ if __name__ == '__main__':
     s3 = boto3.resource('s3')
     git = Repo(rel('blog')).git
 
-    log('Starting server')
+    logging.info('Starting server')
     run(host = '0.0.0.0', port = 5678)
