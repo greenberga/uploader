@@ -40,7 +40,7 @@ def test_make_post():
         # WITH NO PASSED DATE OR SUMMARY
         (
             ('123', None, 'POSTCONTENT', None),
-            'blog/_posts/%s-123.md' % str_today,
+            os.path.abspath('blog/_posts/%s-123.md' % str_today),
             r'''---
 layout: post
 ---
@@ -55,7 +55,7 @@ layout: post
         # WITH PASSED DATE
         (
             ('234', '2017-03-27', 'POSTCONTENT', None),
-            'blog/_posts/%s-234.md' % str_today,
+            os.path.abspath('blog/_posts/%s-234.md' % str_today),
             r'''---
 layout: post
 ---
@@ -70,7 +70,7 @@ layout: post
         # WITH PASSED SUMMARY
         (
             ('123', None, 'POSTCONTENT', 'A post about content'),
-            'blog/_posts/%s-123.md' % str_today,
+            os.path.abspath('blog/_posts/%s-123.md' % str_today),
             r'''---
 layout: post
 ---
