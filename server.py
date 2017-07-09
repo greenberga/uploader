@@ -18,8 +18,8 @@ from PIL.ExifTags import TAGS as EXIF_TAGS
 from requests.exceptions import RequestException
 
 logging.basicConfig(
-    format = '[%(levelname)s] %(message)s',
-    level = logging.DEBUG,
+    format = '[%(levelname)s] (%(name)s) %(message)s',
+    level = logging.INFO,
 )
 
 uploader_dirpath = dirname(realpath(__file__))
