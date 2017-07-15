@@ -17,11 +17,6 @@ from PIL import Image
 from PIL.ExifTags import TAGS as EXIF_TAGS
 from requests.exceptions import RequestException
 
-logging.basicConfig(
-    format = '[%(levelname)s] (%(name)s) %(message)s',
-    level = logging.INFO,
-)
-
 uploader_dirpath = dirname(realpath(__file__))
 rel = lambda f: join(uploader_dirpath, f)
 
@@ -37,7 +32,10 @@ config = ConfigParser()
 config.read(rel('config.ini'))
 config = config[mode]
 
-DRY = environ.get('DRY')
+logging.basicConfig(
+    format = '[%(levelname)s] (%(name)s) %(message)s',
+    level = logging.INFO if mode == 'prod' else logging.DEBUG,
+)
 
 ORIENTATIONS = [
     None,
@@ -53,6 +51,8 @@ ORIENTATIONS = [
 
 TEMP_PATH = '/tmp'
 
+MAILGUN_AUTH = ( 'api', config['mailgun-key'] )
+
 class UploaderError(Exception):
     pass
 
@@ -64,36 +64,44 @@ def is_authorized():
     return authorized_senders.match(sender) is not None
 
 
-def parse_attachment(attachment):
-    """
-    Parses a Mailgun attachment string into a JSON object and extracts its
-    URL, filename, and Content-Type.
-    """
-
-    attachment = json.loads(attachment)
-
-    try:
-        attachment = attachment[0]
-    except IndexError as e:
-        logging.exception("Couldn't find any attached files")
-        raise UploaderError
-
-    return ( attachment['url'], attachment['name'], attachment['content-type'] )
-
-
-def download_attachment(url, save_path):
+def download_attachments(attachments):
     """
     Downloads a media attachment from Mailgun.
 
     Parameters
     ----------
-    url: The string URL pointing to the attachment's location on Mailgun.
-    save_path: A string location to save the downloaded attachment on disk.
+    attachments: A string of attachments JSON data from a Mailgun request.
+
+    Returns
+    -------
+    A tuple containing
+    (1) A path to where the attachment is saved on disk.
+    (2) A mimetype string for the attachment file.
     """
 
+    # Attempt to parse the attachment from the request form.
+    attachments = json.loads(attachments)
     try:
-        auth = ( 'api', config['mailgun-key'] )
-        response = requests.get(url, auth = auth, stream = True)
+        attachment = attachments[0]
+    except IndexError as e:
+        logging.exception("Couldn't find any attached files")
+        raise UploaderError
+
+    url = attachment['url']
+    name = attachment['name']
+    content_type = attachment['content-type']
+
+    # Currently only images are valid.
+    # TODO: Eventually, if other file types (or no files) are supported,
+    # this check should be made more robust.
+    if not content_type.startswith('image'):
+        logging.error("Unsupported file type '%s'" % content_type)
+        raise UploaderError
+
+    # SIDE EFFECT: Download the parsed attachment to a temporary location.
+    save_path = join(TEMP_PATH, name)
+    try:
+        response = requests.get(url, auth = MAILGUN_AUTH, stream = True)
         response.raise_for_status()
         with open(save_path, 'wb') as f:
             for chunk in response:
@@ -102,6 +110,7 @@ def download_attachment(url, save_path):
         logging.exception('Failed to download attachment \'{}\''.format(url))
         raise UploaderError
 
+    return save_path, content_type
 
 def get_new_oid():
     posts = listdir(rel('blog/_posts'))
@@ -140,7 +149,7 @@ def delete(*paths):
 
     for path in paths:
         logging.info('Deleting {0}'.format(path))
-        if not DRY:
+        if mode == 'prod':
             try:
                 remove(path)
             except OSError as e:
@@ -158,7 +167,7 @@ def upload_files(*file_paths):
         file_name = basename(path)
         logging.info('Uploading {0} to Amazon S3'.format(path))
         bucket = config['aws-bucket']
-        if not DRY:
+        if mode == 'prod':
             with open(path, 'rb') as f:
                 s3.Object(bucket, file_name).put(Body = f, ACL = 'public-read')
 
@@ -170,7 +179,6 @@ def format_summary(summary):
     """
 
     if not summary: return ''
-    summary = html.escape(summary)
     summary = re.sub(
         r'(^|\W)/(\d+)',
         '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(config['domain']),
@@ -179,123 +187,129 @@ def format_summary(summary):
     return '<span>{}</span>'.format(summary)
 
 
-def make_post(oid, date, contents, summary):
-    """
-    Writes a Jekyll markdown post into the blog's _posts directory.
+def resize_image(img, metadata):
 
-    Parameters
-    ----------
-    oid: The ID number of the new post.
-    date: The date to use for tagging the post.
-    contents: An <img/> or <video/> tag containing the main content of the post.
-    summary: A string to be used for the caption of the post.
-    """
-
-    logging.info('Writing post #{0}'.format(oid))
-
-    today = datetime.date.today()
-
-    if date is None:
-        date = today
-    else:
-        date = datetime.datetime.strptime(date, '%Y-%m-%d')
-
-    date = '{d:%B} {d.day}, {d:%Y}'.format(d = date)
-
-    new_post_file_name = rel('blog/_posts/{0}-{1}.md'.format(str(today), oid))
-
-    summary = format_summary(summary)
-
-    post_contents = r'''---
-layout: post
----
-
-<p>
-  <time><a href="/{oid}">{date}</a></time>
-  <a href="/{oid}">{contents}</a>{summary}
-</p>
-'''.format(oid = oid, date = date, contents = contents, summary = summary)
-
-    if not DRY:
-        with open(new_post_file_name, 'w') as f:
-            f.write(post_contents)
-
-
-def make_image_post(oid, summary, path):
-    """
-    Creates a new image post, resizing the original as necessary and uploading
-    to S3. Also performs cleanup of temporary image files.
-
-    Parameters
-    ----------
-    oid: The ID of the new image post.
-    summary: A string summary to be used to caption the image.
-    path: The path to the original, uploaded image file.
-    """
-
-    logging.info('Making image post #{0}'.format(oid))
-
-    try:
-        img = Image.open(path)
-    except (FileNotFoundError, OSError) as e:
-        err_msg = 'Error while attempting to load \'{}\''.format(path)
-        logging.exception(err_msg)
-        raise UploaderError
-
-    meta = get_img_data(img)
-
-    degree_to_rotate = ORIENTATIONS[meta.get('Orientation', 0)]
+    degree_to_rotate = ORIENTATIONS[metadata.get('Orientation', 0)]
     if degree_to_rotate is not None:
         img = img.rotate(degree_to_rotate, expand = True)
 
-    logging.info('Resizing image #{0} ({1})'.format(oid, path))
     width, height = img.size
     larger_dimension = width if width > height else height
     scales = [ x / larger_dimension for x in [ 320.0, 640.0, 960.0, 1280.0 ] ]
     new_sizes = [ (round(width * s), round(height * s)) for s in scales ]
-    new_files = [ '{0}-{1}.jpg'.format(oid, w) for w, h in new_sizes ]
-    new_files = [ join(TEMP_PATH, f) for f in new_files ]
+    return [ img.resize(size, Image.LANCZOS) for size in new_sizes ]
 
-    if not DRY:
-        for size, name in zip(new_sizes, new_files):
-            resized = img.resize(size, Image.LANCZOS)
-            resized.save(name)
-            resized.close()
+
+def create_img_tag(oid, widths, summary):
+
+    assets_url = '{{ site.assets_url }}'
+
+    # Use the second-to-smallest file (widths[1]) as the default.
+    src = '{0}/{1}'.format(assets_url, widths[1])
+    srcset = [ '%s/%d-%d.jpg %dw' % (assets_url, oid, w, w) for w in widths ]
+    img_tag = '<img src="{0}" '.format(src)
+    img_tag += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
+    img_tag += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
+    img_tag += 'alt="{{ page.summary }}" ' if summary else ''
+    img_tag += '/>'
+
+    return img_tag
+
+def process_image(post_object, img_path):
+
+    oid = post_object['oid']
+
+    logging.info('Making image post #%s' % oid)
+
+    try:
+        img = Image.open(img_path)
+    except (FileNotFoundError, OSError) as e:
+        logging.exception("Error loading '%s'" % img_path)
+        raise UploaderError
+
+    metadata = get_img_data(img)
+
+    # Attempt to extract the date the image was captured from the metadata.
+    if 'DateTime' in metadata:
+        dt = metadata['DateTime']
+        post_object['date'] = dt.split(' ')[0].replace(':', '-')
+
+    logging.info('Resizing image #%s (%s)' % (oid, img_path))
+
+    # 1. Get list of resized `Image`s.
+    resized = resize_image(img, metadata)
+
+    # 2. Make a list of their widths.
+    widths = [ r.size[0] for r in resized ]
+
+    # 3. Save them as {oid}-{width}.jpg in a temporary location.
+    new_files = [ join(TEMP_PATH, '%d-%d.jpg' % (oid, w)) for w in widths ]
+    for r, f in zip(resized, new_files):
+        r.save(f)
+        r.close()
 
     img.close()
 
     # Upload resized images to S3.
     upload_files(*new_files)
 
-    # Clean up temporary and local files.
-    delete(path, *new_files)
+    # Clean up temporary files.
+    delete(img_path, *new_files)
 
-    try:
-        dt = meta['DateTime']
-        dt = dt.split(' ')[0].replace(':', '-')
-    except KeyError:
-        dt = None
+    # Use the largest of the resized images for the OpenGraph image meta tag.
+    post_object['og_image'] = '%d-%d.jpg' % (oid, max(widths))
+    post_object['content'] = create_img_tag(oid, widths, post_object['summary'])
 
-    new_file_names = [ basename(f) for f in new_files ]
-    assets_url = '{{ site.assets_url }}'
 
-    # Use the second-to-smallest file (new_file_names[1]) as the default.
-    src = '{0}/{1}'.format(assets_url, new_file_names[1])
+def create_post(post_object):
 
-    widths = [ w for w, h in new_sizes ]
-    srcset_data = zip(new_file_names, widths)
-    srcset = [ '{0}/{1} {2}w'.format(assets_url, f, w) for f, w in srcset_data ]
+    oid = post_object['oid']
 
-    img = '<img src="{0}" '.format(src)
-    img += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
-    img += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
+    logging.info('Writing post #{0}'.format(oid))
+
+    today = datetime.date.today()
+
+    if 'date' in post_object:
+        date = datetime.datetime.strptime(post_object['date'], '%Y-%m-%d')
+    else:
+        date = today
+
+    date_str = '{d:%B} {d.day}, {d:%Y}'.format(d = date)
+
+    lines = [
+        '---',
+        'layout: post',
+        "summary: '%s'" % post_object['summary']
+    ]
+
+    if 'og_image' in post_object:
+        lines.append('og_image: %s' % post_object['og_image'])
+
+    lines.extend([
+        '---',
+        '',
+        '<p>',
+        '  <time>',
+        '    <a href="/%s">%s</a>' % (oid, date_str),
+        '  </time>',
+        '  <a href="/%s">' % oid,
+        '    %s' % post_object['content'],
+        '  </a>',
+    ])
+
+    summary = post_object['summary']
     if summary:
-        img += 'alt="{}" '.format(html.escape(summary))
-    img += '/>'
+        lines.append('  <span>%s</span>' % format_summary(summary))
 
-    # Create the blog post and write it in the directory.
-    make_post(oid, dt, img, summary)
+    lines.extend([ '</p>', '' ])
+    contents = lines.join('\n')
 
+    logging.debug(contents)
+
+    file_name = rel('blog/_posts/{0}-{1}.md'.format(str(today), oid))
+    if mode == 'prod':
+        with open(file_name, 'w') as f:
+            f.write(contents)
 
 def update_site(new_post_number):
     """
@@ -309,7 +323,7 @@ def update_site(new_post_number):
 
     logging.info('Uploading blog post #{0}'.format(new_post_number))
 
-    if not DRY:
+    if mode == 'prod':
         with pushd(uploader_dirpath):
             git.add('_posts')
             git.commit('-m', 'Add post {0}'.format(new_post_number))
@@ -320,7 +334,8 @@ def update_site(new_post_number):
 def upload():
 
     if not is_authorized():
-        abort(401)
+        logging.error('Unauthorized request to /upload')
+        abort(406)
 
     # Ensure the local blog copy is up to date.
     with pushd(uploader_dirpath):
@@ -328,27 +343,29 @@ def upload():
 
     try:
 
-        summary = request.forms.get('subject', '')
-        file_url, file_name, file_type = parse_attachment(
-            request.forms.get('attachments')
-        )
-
-        path = join(TEMP_PATH, file_name)
-
-        download_attachment(file_url, path)
+        post_object = {}
 
         new_oid = get_new_oid()
+        post_object['oid'] = new_oid
 
-        if file_type.startswith('image'):
-            make_image_post(new_oid, summary, path)
-        else:
-            logging.error('Unsupported file type \'{0}\''.format(file_type))
-            raise UploaderError
+        summary = request.forms.get('subject', '')
+        post_object['summary'] = html.escape(summary)
+
+        fpath, ftype = download_attachments(request.forms.get('attachments'))
+
+        # This section creates the main content for the post, based on the
+        # type of uploaded file. The `process_<type>` functions update the
+        # `post_object` with values that will be used to write the post,
+        # but also perform side effects (like resizing, uploading, etc.)
+        if ftype.startswith('image'):
+            process_image(post_object, fpath)
+
+        create_post(post_object)
 
         update_site(new_oid)
 
     except UploaderError:
-        abort(500)
+        abort(406)
 
 
 if __name__ == '__main__':
