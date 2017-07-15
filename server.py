@@ -304,7 +304,7 @@ def create_post(post_object):
         lines.append('  <span>%s</span>' % format_summary(summary))
 
     lines.extend([ '</p>', '' ])
-    contents = lines.join('\n')
+    contents = '\n'.join(lines)
 
     logging.debug(contents)
 
