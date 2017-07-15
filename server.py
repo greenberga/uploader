@@ -189,6 +189,19 @@ def format_summary(summary):
 
 
 def resize_image(img, metadata):
+    """
+    Resizes an image into four different sizes.
+
+    Parameters
+    ----------
+    img: A `PIL.Image` to be resized.
+    metadata: A dictionary of EXIF data for the image. Used to determine the
+    image's orientation, because it might need to be rotated.
+
+    Returns
+    -------
+    A list of four resized `PIL.Image`s.
+    """
 
     degree_to_rotate = ORIENTATIONS[metadata.get('Orientation', 0)]
     if degree_to_rotate is not None:
@@ -202,6 +215,21 @@ def resize_image(img, metadata):
 
 
 def create_img_tag(oid, widths, summary):
+    """
+    Creates an HTML <img> tag for an image post. Uses the OID, widths, and
+    optional summary for the different components of the tag.
+
+    Parameters
+    ----------
+    oid: A number representing the OID of the <img>'s associated post.
+    widths: A list of numbers representing each width of the image.
+    summary: A summary image that, if truthy, will cause an "alt" attribute to
+    be added to the tag.
+
+    Returns
+    -------
+    A string <img> tag.
+    """
 
     assets_url = '{{ site.assets_url }}'
 
@@ -217,6 +245,15 @@ def create_img_tag(oid, widths, summary):
     return img_tag
 
 def process_image(post_object, img_path):
+    """
+    Processes an uploaded image file, extract information from it to generate
+    a post.
+
+    Parameters
+    ----------
+    post_object: A dictionary of post data that will be updated.
+    img_path: A temp path to the uploaded image file.
+    """
 
     oid = post_object['oid']
 
@@ -263,6 +300,15 @@ def process_image(post_object, img_path):
 
 
 def create_post(post_object):
+    """
+    Converts a post object dictionary into an actual post and writes it
+    to a file.
+
+    Parameters
+    ----------
+    post_object: A dictionary of data for the post. Includes things like OID,
+    content, summary, date, etc.
+    """
 
     oid = post_object['oid']
 
