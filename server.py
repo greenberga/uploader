@@ -181,12 +181,11 @@ def format_summary(summary):
     """
 
     if not summary: return ''
-    summary = re.sub(
+    return re.sub(
         r'(^|\W)/(\d+)',
         '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(config['domain']),
         summary,
     )
-    return '<span>{}</span>'.format(summary)
 
 
 def resize_image(img, metadata):
