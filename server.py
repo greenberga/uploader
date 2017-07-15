@@ -281,7 +281,7 @@ def create_post(post_object):
     lines = [
         '---',
         'layout: post',
-        "summary: '%s'" % post_object['summary']
+        "summary: '%s'" % (post_object['summary'] or 'Post #%d' % oid)
     ]
 
     if 'og_image' in post_object:
