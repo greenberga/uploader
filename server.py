@@ -32,9 +32,11 @@ config = ConfigParser()
 config.read(rel('config.ini'))
 config = config[mode]
 
+DRY = environ.get('DRY')
+
 logging.basicConfig(
     format = '[%(levelname)s] (%(name)s) %(message)s',
-    level = logging.INFO if mode == 'prod' else logging.DEBUG,
+    level = logging.DEBUG if DRY else logging.INFO,
 )
 
 ORIENTATIONS = [
@@ -149,7 +151,7 @@ def delete(*paths):
 
     for path in paths:
         logging.info('Deleting {0}'.format(path))
-        if mode == 'prod':
+        if not DRY:
             try:
                 remove(path)
             except OSError as e:
@@ -167,7 +169,7 @@ def upload_files(*file_paths):
         file_name = basename(path)
         logging.info('Uploading {0} to Amazon S3'.format(path))
         bucket = config['aws-bucket']
-        if mode == 'prod':
+        if not DRY:
             with open(path, 'rb') as f:
                 s3.Object(bucket, file_name).put(Body = f, ACL = 'public-read')
 
@@ -307,7 +309,7 @@ def create_post(post_object):
     logging.debug(contents)
 
     file_name = rel('blog/_posts/{0}-{1}.md'.format(str(today), oid))
-    if mode == 'prod':
+    if not DRY:
         with open(file_name, 'w') as f:
             f.write(contents)
 
@@ -323,7 +325,7 @@ def update_site(new_post_number):
 
     logging.info('Uploading blog post #{0}'.format(new_post_number))
 
-    if mode == 'prod':
+    if not DRY:
         with pushd(uploader_dirpath):
             git.add('_posts')
             git.commit('-m', 'Add post {0}'.format(new_post_number))
