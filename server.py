@@ -206,7 +206,7 @@ def create_img_tag(oid, widths, summary):
     assets_url = '{{ site.assets_url }}'
 
     # Use the second-to-smallest file (widths[1]) as the default.
-    src = '{0}/{1}'.format(assets_url, widths[1])
+    src = '%s/%d-%d.jpg' % (assets_url, oid, widths[1])
     srcset = [ '%s/%d-%d.jpg %dw' % (assets_url, oid, w, w) for w in widths ]
     img_tag = '<img src="{0}" '.format(src)
     img_tag += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
