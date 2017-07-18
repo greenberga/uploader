@@ -2,12 +2,13 @@ import datetime
 import os
 from unittest.mock import patch, mock_open
 
-from nose.tools import ok_
+from nose.tools import eq_
 
 old_mode = os.environ.get('MODE', None)
 os.environ['MODE'] = 'test'
 
-from server import format_summary, make_post
+from server import autolink_posts
+from server import make_post
 
 def teardown():
     if old_mode:
@@ -15,15 +16,15 @@ def teardown():
     else:
         del os.environ['MODE']
 
-def test_format_summary():
+def test_autolink_posts():
 
     specs = {
-        'Pic of Joe, see /644': '<span>Pic of Joe, see <a href="http://foo.bar/644">/644</a></span>',
-        'Cool pic, <3 //6': '<span>Cool pic, &lt;3 /<a href="http://foo.bar/6">/6</a></span>',
-        'A pic, /s': '<span>A pic, /s</span>',
-        'This pic is 10/10!': '<span>This pic is 10/10!</span>',
-        '/164 is similar': '<span><a href="http://foo.bar/164">/164</a> is similar</span>',
-        '(/322,/333)': '<span>(<a href="http://foo.bar/322">/322</a>,<a href="http://foo.bar/333">/333</a>)</span>',
+        'Pic of Joe, see /644': 'Pic of Joe, see <a href="http://foo.bar/644">/644</a>',
+        'Cool pic, <3 //6': 'Cool pic, <3 /<a href="http://foo.bar/6">/6</a>',
+        'A pic, /s': 'A pic, /s',
+        'This pic is 10/10!': 'This pic is 10/10!',
+        '/164 is similar': '<a href="http://foo.bar/164">/164</a> is similar',
+        '(/322,/333)': '(<a href="http://foo.bar/322">/322</a>,<a href="http://foo.bar/333">/333</a>)',
     }
 
     for summary, expected in specs.items():

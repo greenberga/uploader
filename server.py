@@ -174,17 +174,17 @@ def upload_files(*file_paths):
                 s3.Object(bucket, file_name).put(Body = f, ACL = 'public-read')
 
 
-def format_summary(summary):
+def autolink_posts(text):
     """
-    Formats a summary string, sanitizing special HTML characters and
-    converting link patterns into actual anchor tags.
+    Searches a string of text for substrings that look like posts (/XXX) and
+    replaces them with <a> tags to the specified post.
     """
 
-    if not summary: return ''
+    if not text: return ''
     return re.sub(
         r'(^|\W)/(\d+)',
         '\g<1><a href="http://{}/\g<2>">/\g<2></a>'.format(config['domain']),
-        summary,
+        text,
     )
 
 
@@ -346,7 +346,7 @@ def create_post(post_object):
 
     summary = post_object['summary']
     if summary:
-        lines.append('  <span>%s</span>' % format_summary(summary))
+        lines.append('  <span>%s</span>' % autolink_posts(summary))
 
     lines.extend([ '</p>', '' ])
     contents = '\n'.join(lines)
