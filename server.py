@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from configparser import ConfigParser
 from os import listdir, remove, environ, getcwd, chdir
 from os.path import join, basename, dirname, realpath
-from sys import stdout, stderr
 
 import requests
 import boto3
