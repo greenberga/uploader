@@ -38,6 +38,8 @@ logging.basicConfig(
     level = logging.DEBUG if DRY else logging.INFO,
 )
 
+S3 = boto3.client('s3')
+
 ORIENTATIONS = [
     None,
     None,
@@ -167,10 +169,14 @@ def upload_files(*file_paths):
     for path in file_paths:
         file_name = basename(path)
         logging.info('Uploading {0} to Amazon S3'.format(path))
-        bucket = config['aws-bucket']
         if not DRY:
             with open(path, 'rb') as f:
-                s3.Object(bucket, file_name).put(Body = f, ACL = 'public-read')
+                S3.put_object(
+                    Bucket = config['aws-bucket'],
+                    Key = file_name,
+                    Body = f,
+                    ACL = 'public-read',
+                )
 
 
 def autolink_posts(text):
@@ -383,6 +389,9 @@ def upload():
         logging.error('Unauthorized request to /upload')
         abort(406)
 
+    # Get a git reference to the blog repository.
+    git = Repo(rel('blog')).git
+
     # Ensure the local blog copy is up to date.
     with pushd(uploader_dirpath):
         git.pull('origin', 'master')
@@ -415,10 +424,5 @@ def upload():
 
 
 if __name__ == '__main__':
-
-    # Initialize connection to AWS S3 and load the Git Repository object.
-    s3 = boto3.resource('s3')
-    git = Repo(rel('blog')).git
-
     logging.info('Starting server')
     run(host = '0.0.0.0', port = 5678)
