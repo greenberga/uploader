@@ -39,6 +39,7 @@ logging.basicConfig(
 )
 
 S3 = boto3.client('s3')
+git = Repo(rel('blog')).git if mode != 'test' else None
 
 ORIENTATIONS = [
     None,
@@ -388,9 +389,6 @@ def upload():
     if not is_authorized():
         logging.error('Unauthorized request to /upload')
         abort(406)
-
-    # Get a git reference to the blog repository.
-    git = Repo(rel('blog')).git
 
     # Ensure the local blog copy is up to date.
     with pushd(uploader_dirpath):
