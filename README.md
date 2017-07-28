@@ -11,3 +11,9 @@ attached photo (and some metadata), resizes it, creates a new post on the
 GitHub Pages site's repository, and pushes it (which republishes the website.)
 
 It's implemented in Python using [Bottle](https://bottlepy.org/docs/dev/).
+
+## Testing
+
+```
+nosetests --with-coverage --cover-package=server --cover-erase --cover-html
+```
