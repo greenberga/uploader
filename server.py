@@ -1,8 +1,11 @@
 import datetime
+import hashlib
+import hmac
 import html
 import json
 import logging
 import re
+import time
 from contextlib import contextmanager
 from configparser import ConfigParser
 from os import listdir, remove, environ, getcwd, chdir
@@ -62,10 +65,37 @@ class UploaderError(Exception):
 
 
 authorized_senders = re.compile(config['authorized-senders-pattern'])
-
 def is_authorized():
     sender = request.forms.get('from')
     return authorized_senders.match(sender) is not None
+
+
+cached_mailgun_token = None
+def verify_mailgun_request(timestamp, token, signature):
+    """
+    Ensures that a webhook request from Mailgun is valid.
+    Raises an exception if the request is invalid.
+    """
+
+    # Check to avoid reused tokens to prevent replay attacks.
+    global cached_mailgun_token
+    if token == cached_mailgun_token:
+        logging.error('Mailgun token is identical to the previous one')
+        raise UploaderError
+    cached_mailgun_token = token
+
+    # Ensure that request timestamp is not older than 1 minute.
+    if time.time() - int(timestamp) > 60:
+        logging.error('Mailgun timestamp is older than 60 seconds')
+        raise UploaderError
+
+    # Ensure that request signature matches up.
+    api_key = bytes(config['mailgun-key'], 'utf-8')
+    message = (timestamp + token).encode('utf-8')
+    computed = hmac.new(api_key, message, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(computed, signature):
+        logging.error('Computed signature does not match request signature')
+        raise UploaderError
 
 
 def download_attachments(attachments):
@@ -389,6 +419,12 @@ def upload():
     if not is_authorized():
         logging.error('Unauthorized request to /upload')
         abort(406)
+
+    # Verify that the request is legitimate.
+    timestamp = request.forms.get('timestamp')
+    token = request.forms.get('token')
+    signature = request.forms.get('signature')
+    verify_mailgun_request(timestamp, token, signature)
 
     # Ensure the local blog copy is up to date.
     with pushd(uploader_dirpath):
