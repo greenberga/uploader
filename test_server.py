@@ -11,12 +11,13 @@ os.environ['MODE'] = 'test'
 
 from server import (
     UploaderError,
-    autolink_posts,
+    verify_mailgun_request,
     download_attachments,
     get_new_oid,
     get_img_data,
     delete,
     upload_files,
+    autolink_posts,
     resize_image,
     create_img_tag,
     process_image,
@@ -28,6 +29,54 @@ def teardown():
         os.environ['MODE'] = old_mode
     else:
         del os.environ['MODE']
+
+@patch('time.time', Mock(return_value = 1501718220))
+def test_verify_mailgun_request_successful():
+
+    # If the function completes without raising, it was successful.
+    verify_mailgun_request(
+        '1501718219',
+        'beefc0ffeef00dc001',
+        '6f18a769135bdb32fec4a4d24ee7efff082f2d23646f25ea790b883d1a7805ea',
+    )
+
+@raises(UploaderError)
+@patch('time.time', Mock(return_value = 1501718220))
+def test_verify_mailgun_request_duplicate_token():
+
+    verify_mailgun_request(
+        '1501718219',
+        'c0ffeec001f00dbeef',
+        'e473b85d8eaa5c71f2574dd81f42b7b478d1a320515d337ca8c7022419aacb84',
+    )
+
+    # Token is identical to the token in the previous request. Should raise.
+    verify_mailgun_request(
+        '1501718219',
+        'c0ffeec001f00dbeef',
+        'e473b85d8eaa5c71f2574dd81f42b7b478d1a320515d337ca8c7022419aacb84',
+    )
+
+@raises(UploaderError)
+def test_verify_mailgun_request_expired_timestamp():
+
+    # This timestamp will be older than 60s, so this should raise.
+    verify_mailgun_request(
+        '1501718219',
+        'aceaceaceaceaceaceaceace',
+        'e787eb21731cf1888e078796224c23c3327497668e0a83a23bcda76b19b23c20',
+    )
+
+@raises(UploaderError)
+@patch('time.time', Mock(return_value = 1501718220))
+def test_verify_mailgun_request_invalid_signature():
+
+    # This signature is invalid, so this should raise.
+    verify_mailgun_request(
+        '1501718219',
+        'c001c001c001',
+        'this-test-is-not-gonna-work-because-the-signature-is-not-invalid',
+    )
 
 @patch('requests.get')
 @patch('server.open', mock_open(), create = True)
