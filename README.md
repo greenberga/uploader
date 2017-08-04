@@ -17,3 +17,7 @@ It's implemented in Python using [Bottle](https://bottlepy.org/docs/dev/).
 ```
 nosetests --with-coverage --cover-package=server --cover-erase --cover-html
 ```
+
+## License
+
+[MIT](LICENSE)
