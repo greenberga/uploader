@@ -60,6 +60,7 @@ def send_update(recipient, new_count):
         'subject': 'New photos on {}'.format(config['domain']),
         'text': text_content,
         'html': html_content,
+        'bcc': config['mailgun-bcc'],
         'h:Reply-To': config['mailgun-reply-to'],
     }
 
