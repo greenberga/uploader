@@ -60,9 +60,6 @@ TEMP_PATH = '/tmp'
 
 MAILGUN_AUTH = ( 'api', config['mailgun-key'] )
 
-class UploaderError(Exception):
-    pass
-
 
 authorized_senders = re.compile(config['authorized-senders-pattern'])
 def is_authorized():
@@ -80,22 +77,19 @@ def verify_mailgun_request(timestamp, token, signature):
     # Check to avoid reused tokens to prevent replay attacks.
     global cached_mailgun_token
     if token == cached_mailgun_token:
-        logging.error('Mailgun token is identical to the previous one')
-        raise UploaderError
+        raise ValueError('Mailgun token is identical to the previous one')
     cached_mailgun_token = token
 
     # Ensure that request timestamp is not older than 1 minute.
     if time.time() - int(timestamp) > 60:
-        logging.error('Mailgun timestamp is older than 60 seconds')
-        raise UploaderError
+        raise ValueError('Mailgun timestamp is older than 60 seconds')
 
     # Ensure that request signature matches up.
     api_key = bytes(config['mailgun-key'], 'utf-8')
     message = (timestamp + token).encode('utf-8')
     computed = hmac.new(api_key, message, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(computed, signature):
-        logging.error('Computed signature does not match request signature')
-        raise UploaderError
+        raise ValueError('Computed signature does not match request signature')
 
 
 def download_attachments(attachments):
@@ -114,13 +108,7 @@ def download_attachments(attachments):
     """
 
     # Attempt to parse the attachment from the request form.
-    attachments = json.loads(attachments)
-    try:
-        attachment = attachments[0]
-    except IndexError as e:
-        logging.exception("Couldn't find any attached files")
-        raise UploaderError
-
+    attachment = json.loads(attachments)[0]
     url = attachment['url']
     name = attachment['name']
     content_type = attachment['content-type']
@@ -129,20 +117,15 @@ def download_attachments(attachments):
     # TODO: Eventually, if other file types (or no files) are supported,
     # this check should be made more robust.
     if not content_type.startswith('image'):
-        logging.error("Unsupported file type '%s'" % content_type)
-        raise UploaderError
+        raise ValueError("Unsupported file type '%s'" % content_type)
 
     # SIDE EFFECT: Download the parsed attachment to a temporary location.
     save_path = join(TEMP_PATH, name)
-    try:
-        response = requests.get(url, auth = MAILGUN_AUTH, stream = True)
-        response.raise_for_status()
-        with open(save_path, 'wb') as f:
-            for chunk in response:
-                f.write(chunk)
-    except RequestException as e:
-        logging.exception('Failed to download attachment \'{}\''.format(url))
-        raise UploaderError
+    response = requests.get(url, auth = MAILGUN_AUTH, stream = True)
+    response.raise_for_status()
+    with open(save_path, 'wb') as f:
+        for chunk in response:
+            f.write(chunk)
 
     return save_path, content_type
 
@@ -184,12 +167,7 @@ def delete(*paths):
     for path in paths:
         logging.info('Deleting {0}'.format(path))
         if not DRY:
-            try:
-                remove(path)
-            except OSError as e:
-                err_msg = 'Error while attempting to delete \'{}\''.format(path)
-                logging.exception(err_msg)
-                raise UploaderError
+            remove(path)
 
 
 def upload_files(*file_paths):
@@ -295,11 +273,7 @@ def process_image(post_object, img_path):
 
     logging.info('Making image post #%s' % oid)
 
-    try:
-        img = Image.open(img_path)
-    except (FileNotFoundError, OSError) as e:
-        logging.exception("Error loading '%s'" % img_path)
-        raise UploaderError
+    img = Image.open(img_path)
 
     metadata = get_img_data(img)
 
@@ -453,7 +427,8 @@ def upload():
 
         update_site(new_oid)
 
-    except UploaderError:
+    except Exception as e:
+        logging.exception(e)
         abort(406)
 
 
