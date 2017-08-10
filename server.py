@@ -293,7 +293,7 @@ def process_image(post_object, img_path):
     # 3. Save them as {oid}-{width}.jpg in a temporary location.
     new_files = [ join(TEMP_PATH, '%d-%d.jpg' % (oid, w)) for w in widths ]
     for r, f in zip(resized, new_files):
-        r.save(f)
+        r.save(f, optimize = True, progressive = True)
         r.close()
 
     img.close()
