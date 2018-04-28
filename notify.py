@@ -15,9 +15,11 @@ config = ConfigParser()
 config.read(path.join(UPLOADER_DIR, 'config.ini'))
 config = config[mode]
 
+blog_path = config.get('blog-path', path.join(UPLOADER_DIR, 'blog'))
+
 def compute_new_post_count():
 
-    all_posts = listdir(path.join(UPLOADER_DIR, 'blog/_posts'))
+    all_posts = listdir(path.join(blog_path, '_posts'))
     all_posts = [ int(p.split('.')[0].split('-')[-1]) for p in all_posts ]
     all_posts = sorted(all_posts)
     latest = all_posts[-1]
