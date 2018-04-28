@@ -5,12 +5,13 @@ Documentation=https://github.com/greenberga/uploader
 [Service]
 User=aaron
 Group=aaron
+WorkingDirectory=/home/aaron/uploader
 Restart=on-failure
-ExecStart=/home/aaron/.pyenv/shims/pipenv run python -u /home/aaron/uploader/server.py
+Environment=LC_ALL=C.UTF-8 LANG=C.UTF-8
+ExecStart=/home/aaron/.pyenv/shims/pipenv run python -u server.py
 ExecReload=/bin/kill -1 $MAINPID
 ExecStop=/bin/kill -15 $MAINPID
 PrivateTmp=true
-PrivateUsers=true
 ProtectSystem=full
 
 [Install]
