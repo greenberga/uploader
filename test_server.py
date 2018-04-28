@@ -255,10 +255,11 @@ def test_process_image(
 
     Image_open.assert_called_once_with('/path/to/file.jpg')
 
-    resized[0].save.assert_called_once_with('/tmp/111-150.jpg')
-    resized[1].save.assert_called_once_with('/tmp/111-200.jpg')
-    resized[2].save.assert_called_once_with('/tmp/111-300.jpg')
-    resized[3].save.assert_called_once_with('/tmp/111-500.jpg')
+    kwargs = { 'optimize': True, 'progressive': True }
+    resized[0].save.assert_called_once_with('/tmp/111-150.jpg', **kwargs)
+    resized[1].save.assert_called_once_with('/tmp/111-200.jpg', **kwargs)
+    resized[2].save.assert_called_once_with('/tmp/111-300.jpg', **kwargs)
+    resized[3].save.assert_called_once_with('/tmp/111-500.jpg', **kwargs)
 
     upload_files.assert_called_once_with(
         '/tmp/111-150.jpg',
