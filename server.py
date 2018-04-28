@@ -41,7 +41,11 @@ logging.basicConfig(
     level = logging.DEBUG if DRY else logging.INFO,
 )
 
-S3 = boto3.client('s3')
+S3 = boto3.client(
+    's3',
+    aws_access_key_id = config['aws-access-key-id'],
+    aws_secret_access_key = config['aws-secret-access-key'],
+)
 
 blog_path = config.get('blog-path', rel('blog'))
 git = Repo(blog_path).git if mode != 'test' else None
