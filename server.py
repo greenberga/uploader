@@ -42,7 +42,9 @@ logging.basicConfig(
 )
 
 S3 = boto3.client('s3')
-git = Repo(rel('blog')).git if mode != 'test' else None
+
+blog_path = config.get('blog-path', rel('blog'))
+git = Repo(blog_path).git if mode != 'test' else None
 
 ORIENTATIONS = [
     None,
@@ -130,7 +132,7 @@ def download_attachments(attachments):
     return save_path, content_type
 
 def get_new_oid():
-    posts = listdir(rel('blog/_posts'))
+    posts = listdir(join(blog_path, '_posts'))
     sorted_oids = sorted([ int(p.split('.')[0].split('-')[-1]) for p in posts ])
     return sorted_oids[-1] + 1
 
@@ -363,7 +365,7 @@ def create_post(post_object):
 
     logging.debug(contents)
 
-    file_name = rel('blog/_posts/{0}-{1}.md'.format(str(today), oid))
+    file_name = join(blog_path, '_posts/{0}-{1}.md'.format(str(today), oid))
     if not DRY:
         with open(file_name, 'w') as f:
             f.write(contents)
