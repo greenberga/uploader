@@ -1,0 +1,18 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+gitpython = "*"
+pillow = "*"
+"boto3" = "*"
+bottle = "*"
+requests = "*"
+
+[dev-packages]
+nose = "*"
+coverage = "*"
+
+[requires]
+python_version = "3.6"
