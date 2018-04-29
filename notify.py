@@ -1,5 +1,3 @@
-#!/home/aaron/uploader/.venv/bin/python
-
 import json
 from os import environ, listdir, path
 from configparser import ConfigParser
