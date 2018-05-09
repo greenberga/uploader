@@ -91,7 +91,7 @@ def verify_mailgun_request(timestamp, token, signature):
         raise ValueError('Mailgun timestamp is older than 60 seconds')
 
     # Ensure that request signature matches up.
-    api_key = bytes(config['mailgun-key'], 'utf-8')
+    api_key = config['mailgun-key'].encode('utf-8')
     message = (timestamp + token).encode('utf-8')
     computed = hmac.new(api_key, message, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(computed, signature):
