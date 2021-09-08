@@ -7,6 +7,6 @@ docker-image:
 	echo $(GITCOMMIT) > .docker-image
 
 run-docker:
-	docker run --rm -it -v $(PWD):/app -w /app  -p 5000:5000 uploader:$(DOCKERIMAGE)
+	docker run --rm -it -v $(PWD):/app -w /app -p 5000:5000 uploader:$(DOCKERIMAGE)
 
 .PHONY: docker-image
