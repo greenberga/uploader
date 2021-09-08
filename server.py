@@ -1,23 +1,20 @@
 import datetime
-import hashlib
 import hmac
 import html
-import json
 import logging
 import re
 import time
 from contextlib import contextmanager
 from configparser import ConfigParser
+from email.utils import parseaddr
 from os import listdir, remove, environ, getcwd, chdir
 from os.path import join, basename, dirname, realpath
 
-import requests
 import boto3
 from bottle import abort, post, request, run
 from git import Repo
 from PIL import Image
 from PIL.ExifTags import TAGS as EXIF_TAGS
-from requests.exceptions import RequestException
 
 uploader_dirpath = dirname(realpath(__file__))
 rel = lambda f: join(uploader_dirpath, f)
@@ -48,7 +45,7 @@ S3 = boto3.client(
 )
 
 blog_path = config.get('blog-path', rel('blog'))
-git = Repo(blog_path).git if mode != 'test' else None
+git = Repo(blog_path).git if mode == 'prod' else None
 
 ORIENTATIONS = [
     None,
@@ -64,76 +61,15 @@ ORIENTATIONS = [
 
 TEMP_PATH = '/tmp'
 
-MAILGUN_AUTH = ( 'api', config['mailgun-key'] )
-
 
 authorized_senders = re.compile(config['authorized-senders-pattern'])
-def is_authorized():
-    sender = request.forms.get('from')
-    return authorized_senders.match(sender) is not None
+def is_authorized(request):
+    _, email = parseaddr(request.params.get('from'))
+    sender_authorized = authorized_senders.match(email) is not None
+    user_authorized = hmac.compare_digest(request.auth[0], config['sendgrid-user'])
+    pass_authorized = hmac.compare_digest(request.auth[1], config['sendgrid-pass'])
+    return sender_authorized and user_authorized and pass_authorized
 
-
-cached_mailgun_token = None
-def verify_mailgun_request(timestamp, token, signature):
-    """
-    Ensures that a webhook request from Mailgun is valid.
-    Raises an exception if the request is invalid.
-    """
-
-    # Check to avoid reused tokens to prevent replay attacks.
-    global cached_mailgun_token
-    if token == cached_mailgun_token:
-        raise ValueError('Mailgun token is identical to the previous one')
-    cached_mailgun_token = token
-
-    # Ensure that request timestamp is not older than 1 minute.
-    if time.time() - int(timestamp) > 60:
-        raise ValueError('Mailgun timestamp is older than 60 seconds')
-
-    # Ensure that request signature matches up.
-    api_key = config['mailgun-key'].encode('utf-8')
-    message = (timestamp + token).encode('utf-8')
-    computed = hmac.new(api_key, message, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(computed, signature):
-        raise ValueError('Computed signature does not match request signature')
-
-
-def download_attachments(attachments):
-    """
-    Downloads a media attachment from Mailgun.
-
-    Parameters
-    ----------
-    attachments: A string of attachments JSON data from a Mailgun request.
-
-    Returns
-    -------
-    A tuple containing
-    (1) A path to where the attachment is saved on disk.
-    (2) A mimetype string for the attachment file.
-    """
-
-    # Attempt to parse the attachment from the request form.
-    attachment = json.loads(attachments)[0]
-    url = attachment['url']
-    name = attachment['name']
-    content_type = attachment['content-type']
-
-    # Currently only images are valid.
-    # TODO: Eventually, if other file types (or no files) are supported,
-    # this check should be made more robust.
-    if not content_type.startswith('image'):
-        raise ValueError("Unsupported file type '%s'" % content_type)
-
-    # SIDE EFFECT: Download the parsed attachment to a temporary location.
-    save_path = join(TEMP_PATH, name)
-    response = requests.get(url, auth = MAILGUN_AUTH, stream = True)
-    response.raise_for_status()
-    with open(save_path, 'wb') as f:
-        for chunk in response:
-            f.write(chunk)
-
-    return save_path, content_type
 
 def get_new_oid():
     posts = listdir(join(blog_path, '_posts'))
@@ -400,19 +336,17 @@ def update_site(new_post_number):
 @post('/upload')
 def upload():
 
-    if not is_authorized():
-        logging.error('Unauthorized request to /upload')
-        abort(406)
+    if request.auth is None:
+        logging.info('No webhook request auth provided')
+        abort(401)
 
-    # Verify that the request is legitimate.
-    timestamp = request.forms.get('timestamp')
-    token = request.forms.get('token')
-    signature = request.forms.get('signature')
-    verify_mailgun_request(timestamp, token, signature)
+    if not is_authorized(request):
+        logging.info('Unauthorized request to /upload')
+        abort(403)
 
     # Ensure the local blog copy is up to date.
     with pushd(uploader_dirpath):
-        git.pull('origin', 'master')
+        git.pull('origin', 'master') if not DRY else None
 
     try:
 
@@ -421,17 +355,18 @@ def upload():
         new_oid = get_new_oid()
         post_object['oid'] = new_oid
 
-        summary = request.forms.get('subject', '')
+        summary = request.params.get('subject', '')
         post_object['summary'] = html.escape(summary)
 
-        fpath, ftype = download_attachments(request.forms.get('attachments'))
+        file_object = request.files.attachment1.file
+        file_type = request.params['attachment-info']['attachment1']['type']
 
         # This section creates the main content for the post, based on the
         # type of uploaded file. The `process_<type>` functions update the
         # `post_object` with values that will be used to write the post,
         # but also perform side effects (like resizing, uploading, etc.)
-        if ftype.startswith('image'):
-            process_image(post_object, fpath)
+        if file_type.startswith('image'):
+            process_image(post_object, file_object)
 
         create_post(post_object)
 
@@ -439,9 +374,9 @@ def upload():
 
     except Exception as e:
         logging.exception(e)
-        abort(406)
+        abort(500)
 
 
 if __name__ == '__main__':
     logging.info('Starting server')
-    run(host = 'localhost', port = 8080)
+    run(host = config.get('host', 'localhost'), port = config.get('port', 8080))

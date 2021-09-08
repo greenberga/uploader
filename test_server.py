@@ -10,8 +10,7 @@ old_mode = os.environ.get('MODE', None)
 os.environ['MODE'] = 'test'
 
 from server import (
-    verify_mailgun_request,
-    download_attachments,
+    is_authorized,
     get_new_oid,
     get_img_data,
     delete,
@@ -29,95 +28,21 @@ def teardown():
     else:
         del os.environ['MODE']
 
-@patch('time.time', Mock(return_value = 1501718220))
-def test_verify_mailgun_request_successful():
 
-    # If the function completes without raising, it was successful.
-    verify_mailgun_request(
-        '1501718219',
-        'beefc0ffeef00dc001',
-        '6f18a769135bdb32fec4a4d24ee7efff082f2d23646f25ea790b883d1a7805ea',
-    )
+def test_is_authorized():
+    SPECS = [
+        (('First Last <email@add.rs>', 'yodelist', 'blastocyte'), True),
+        (('failure@add.rs', 'yodelist', 'blastocyte'), False),
+        (('Cool Name <email@add.rs>', 'failure', 'blastocyte'), False),
+        (('email@add.rs', 'yodelist', 'failure'), False),
+    ]
 
-@patch('time.time', Mock(return_value = 1501718220))
-def test_verify_mailgun_request_duplicate_token():
-
-    verify_mailgun_request(
-        '1501718219',
-        'c0ffeec001f00dbeef',
-        'e473b85d8eaa5c71f2574dd81f42b7b478d1a320515d337ca8c7022419aacb84',
-    )
-
-    # Token is identical to the token in the previous request.
-    with assert_raises(ValueError) as err:
-
-        verify_mailgun_request(
-            '1501718219',
-            'c0ffeec001f00dbeef',
-            'e473b85d8eaa5c71f2574dd81f42b7b478d1a320515d337ca8c7022419aacb84',
-        )
-
-        expected_msg = 'Mailgun token is identical to the previous one'
-        assert str(err.exception) == expected_msg
-
-def test_verify_mailgun_request_expired_timestamp():
-
-    # This timestamp is older than 60s.
-    with assert_raises(ValueError) as err:
-
-        verify_mailgun_request(
-            '1501718219',
-            'aceaceaceaceaceaceaceace',
-            'e787eb21731cf1888e078796224c23c3327497668e0a83a23bcda76b19b23c20',
-        )
-
-        expected_msg = 'Mailgun timestamp is older than 60 seconds'
-        assert str(err.exception) == expected_msg
-
-@patch('time.time', Mock(return_value = 1501718220))
-def test_verify_mailgun_request_invalid_signature():
-
-    with assert_raises(ValueError) as err:
-
-        verify_mailgun_request(
-            '1501718219',
-            'c001c001c001',
-            'this-test-is-not-gonna-work-because-the-signature-is-not-invalid',
-        )
-
-        expected_msg = 'Computed signature does not match request signature'
-        assert str(err.exception) == expected_msg
-
-@patch('requests.get')
-@patch('server.open', mock_open(), create = True)
-def test_successful_download_attachments(_):
-
-    attachments = json.dumps([{
-        'url': 'http://download.attachment/successful-image.jpg',
-        'name': 'successful-image.jpg',
-        'content-type': 'image/jpeg',
-    }])
-
-    save_path, content_type = download_attachments(attachments)
-
-    eq_(save_path, '/tmp/successful-image.jpg')
-    eq_(content_type, 'image/jpeg')
-
-@raises(IndexError)
-def test_download_attachments_no_attachment():
-    attachments = json.dumps([])
-    download_attachments(attachments)
-
-def test_download_attachments_wront_type():
-    attachments = json.dumps([{
-        'url': 'http://download.attachment/bad-type.txt',
-        'name': 'bad-type.txt',
-        'content-type': 'text/plain',
-    }])
-
-    with assert_raises(ValueError) as err:
-        download_attachments(attachments)
-        assert str(err.exception) == "Unsupported file type 'text/plain'"
+    for args, expected in SPECS:
+        e, u, p = args
+        request = Mock()
+        request.params = { 'from': e }
+        request.auth = (u, p)
+        yield eq_, is_authorized(request), expected
 
 @patch('server.listdir', Mock(return_value = [
     '2012-05-15-0.md',
