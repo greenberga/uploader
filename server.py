@@ -1,6 +1,7 @@
 import datetime
 import hmac
 import html
+import json
 import logging
 import re
 import time
@@ -359,7 +360,7 @@ def upload():
         post_object['summary'] = html.escape(summary)
 
         file_object = request.files.attachment1.file
-        file_type = request.params['attachment-info']['attachment1']['type']
+        file_type = json.loads(request.params['attachment-info'])['attachment1']['type']
 
         # This section creates the main content for the post, based on the
         # type of uploaded file. The `process_<type>` functions update the
