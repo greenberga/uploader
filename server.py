@@ -201,7 +201,7 @@ def create_img_tag(oid, widths, summary):
 
     return img_tag
 
-def process_image(post_object, img_path):
+def process_image(post_object, img_obj):
     """
     Processes an uploaded image file, extract information from it to generate
     a post.
@@ -209,14 +209,14 @@ def process_image(post_object, img_path):
     Parameters
     ----------
     post_object: A dictionary of post data that will be updated.
-    img_path: A temp path to the uploaded image file.
+    img_obj: A bottle FileUpload object representing the uploaded file.
     """
 
     oid = post_object['oid']
 
     logging.info('Making image post #%s' % oid)
 
-    img = Image.open(img_path)
+    img = Image.open(img_obj)
 
     metadata = get_img_data(img)
 
@@ -225,7 +225,7 @@ def process_image(post_object, img_path):
         dt = metadata['DateTime']
         post_object['date'] = dt.split(' ')[0].replace(':', '-')
 
-    logging.info('Resizing image #%s (%s)' % (oid, img_path))
+    logging.info('Resizing image #%s' % oid)
 
     # 1. Get list of resized `Image`s.
     resized = resize_image(img, metadata)
@@ -245,7 +245,7 @@ def process_image(post_object, img_path):
     upload_files(*new_files)
 
     # Clean up temporary files.
-    delete(img_path, *new_files)
+    delete(*new_files)
 
     # Use the largest of the resized images for the OpenGraph image meta tag.
     post_object['og_image'] = '%d-%d.jpg' % (oid, max(widths))
