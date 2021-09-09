@@ -55,22 +55,50 @@ def send_update(recipient, new_count):
     )
 
     data = {
-        'to': address,
-        'from': config['mailgun-from'],
-        'subject': 'New photos on {}'.format(config['domain']),
-        'text': text_content,
-        'html': html_content,
-        'bcc': config['mailgun-bcc'],
-        'h:Reply-To': config['mailgun-reply-to'],
+        'personalizations': [
+            {
+                'to': [
+                    {
+                        'email': address,
+                    },
+                ],
+                'bcc': [
+                    {
+                        'email': config['notify-bcc'],
+                    },
+                ],
+                'subject': 'New photos on {}'.format(config['domain']),
+            }
+        ],
+        'from': {
+            'email': config['notify-from'],
+            'name': config['notify-name'],
+        },
+        'reply_to': {
+            'email': config['notify-reply-to'],
+        },
+        'content': [
+            {
+                'type': 'text/plain',
+                'value': text_content,
+            },
+            {
+                'type': 'text/html',
+                'value': html_content,
+            },
+        ],
     }
 
     print('Sending update to %s' % address)
 
     if not DRY:
         response = requests.post(
-            config['mailgun-notifications-url'],
-            auth = ('api', config['mailgun-key']),
-            data = data,
+            config['notify-url'],
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer {}'.format(config['sendgrid-key'])
+            },
+            json = data,
         )
         response.raise_for_status()
 
