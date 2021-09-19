@@ -74,6 +74,10 @@ def is_authorized(request):
 
 def get_new_oid():
     posts = listdir(join(blog_path, '_posts'))
+
+    if len(posts) == 0:
+        return 0
+
     sorted_oids = sorted([ int(p.split('.')[0].split('-')[-1]) for p in posts ])
     return sorted_oids[-1] + 1
 
