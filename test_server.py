@@ -194,7 +194,6 @@ def test_process_image(
     )
 
     delete.assert_called_once_with(
-        '/path/to/file.jpg',
         '/tmp/111-150.jpg',
         '/tmp/111-200.jpg',
         '/tmp/111-300.jpg',
