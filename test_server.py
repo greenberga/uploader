@@ -52,6 +52,11 @@ def test_is_authorized():
 def test_get_new_oid():
     eq_(get_new_oid(), 4)
 
+@patch('server.listdir', Mock(return_value = []))
+def test_get_new_oid():
+    eq_(get_new_oid(), 0)
+
+
 def test_get_img_data():
     img = Mock()
     img._getexif = Mock(return_value = { 274: 3, 306: '2015:04:02' })
