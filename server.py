@@ -308,10 +308,6 @@ def create_post(post_object):
     lines.extend([ '</p>', '' ])
     contents = '\n'.join(lines)
 
-    # Not sure why, but seems I have to double-decode strings?
-    # And this makes the text look right, as opposed to gibberish.
-    contents = contents.encode('raw_unicode_escape').decode('utf-8')
-
     logging.debug(contents)
 
     file_name = join(blog_path, '_posts/{0}-{1}.md'.format(str(today), oid))
