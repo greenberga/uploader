@@ -219,7 +219,7 @@ def process_image(post_object, img_obj):
 
     logging.info('Making image post #%s' % oid)
 
-    img = Image.open(img_obj)
+    img = Image.open(img_obj).convert('RGB')
 
     metadata = get_img_data(img)
 
