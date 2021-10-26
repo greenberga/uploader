@@ -13,7 +13,7 @@ from os.path import join, basename, dirname, realpath
 import boto3
 from bottle import abort, post, request, run
 from git import Repo
-from PIL import Image
+from PIL import Image, ImageOps
 from PIL.ExifTags import TAGS as EXIF_TAGS
 
 uploader_dirpath = dirname(realpath(__file__))
@@ -47,18 +47,6 @@ S3 = boto3.client(
 blog_path = config.get('blog-path', rel('blog'))
 git = Repo(blog_path).git if mode == 'prod' else None
 
-ORIENTATIONS = [
-    None,
-    None,
-    None,
-    -180,
-    None,
-    None,
-    -90,
-    None,
-    -270,
-]
-
 TEMP_PATH = '/tmp'
 
 
@@ -81,9 +69,9 @@ def get_new_oid():
     return sorted_oids[-1] + 1
 
 
-def get_img_data(img):
+def get_img_date(img):
     """
-    Gets an image's EXIF metadata.
+    Attempts to get the date the image's was captured.
 
     Parameters
     ----------
@@ -91,18 +79,21 @@ def get_img_data(img):
 
     Returns
     -------
-    A dictionary keyed by EXIF tags with their data as the values.
+    A date string or None, if the date can't be retrieved.
     """
 
     # Certain image files do not contain EXIF data, and `_getexif()` calls
     # raise an `AttributeError`. If this happens, just return an empty dict.
     try:
-        img_exif = img._getexif()
-        return {
+        img_exif = img.getexif()
+        md = {
             EXIF_TAGS[k]: v for k, v in img_exif.items() if k in EXIF_TAGS
         }
     except AttributeError:
-        return {}
+        md = {}
+
+    if 'DateTime' in md:
+        return md['DateTime'].split(' ')[0].replace(':', '-')
 
 
 def delete(*paths):
@@ -148,24 +139,18 @@ def autolink_posts(text):
     )
 
 
-def resize_image(img, metadata):
+def resize_image(img):
     """
     Resizes an image into four different sizes.
 
     Parameters
     ----------
     img: A `PIL.Image` to be resized.
-    metadata: A dictionary of EXIF data for the image. Used to determine the
-    image's orientation, because it might need to be rotated.
 
     Returns
     -------
     A list of four resized `PIL.Image`s.
     """
-
-    degree_to_rotate = ORIENTATIONS[metadata.get('Orientation', 0)]
-    if degree_to_rotate is not None:
-        img = img.rotate(degree_to_rotate, expand = True)
 
     width, height = img.size
     larger_dimension = width if width > height else height
@@ -219,19 +204,20 @@ def process_image(post_object, img_obj):
 
     logging.info('Making image post #%s' % oid)
 
-    img = Image.open(img_obj).convert('RGB')
-
-    metadata = get_img_data(img)
+    img = Image.open(img_obj)
 
     # Attempt to extract the date the image was captured from the metadata.
-    if 'DateTime' in metadata:
-        dt = metadata['DateTime']
-        post_object['date'] = dt.split(' ')[0].replace(':', '-')
+    # This must be done BEFORE the next step, which seems to remove EXIF data.
+    d = get_img_date(img)
+    if d is not None:
+        post_object['date'] = d
+
+    img = ImageOps.exif_transpose(img).convert('RGB')
 
     logging.info('Resizing image #%s' % oid)
 
     # 1. Get list of resized `Image`s.
-    resized = resize_image(img, metadata)
+    resized = resize_image(img)
 
     # 2. Make a list of their widths.
     widths = [ r.size[0] for r in resized ]

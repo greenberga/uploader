@@ -12,7 +12,7 @@ os.environ['MODE'] = 'test'
 from server import (
     is_authorized,
     get_new_oid,
-    get_img_data,
+    get_img_date,
     delete,
     upload_files,
     autolink_posts,
@@ -57,17 +57,23 @@ def test_get_new_oid():
     eq_(get_new_oid(), 0)
 
 
-def test_get_img_data():
+def test_get_img_date():
     img = Mock()
-    img._getexif = Mock(return_value = { 274: 3, 306: '2015:04:02' })
-    exif = get_img_data(img)
-    eq_(exif, { 'Orientation': 3, 'DateTime': '2015:04:02' })
+    img.getexif = Mock(return_value = { 306: '2015:04:02' })
+    d = get_img_date(img)
+    eq_(d, '2015-04-02')
 
-def test_get_img_data_no_data():
+def test_get_img_date_no_date():
     img = Mock()
-    img._getexif = Mock(side_effect = AttributeError)
-    exif = get_img_data(img)
-    eq_(exif, {})
+    img.getexif = Mock(return_value = {})
+    exif = get_img_date(img)
+    eq_(exif, None)
+
+def test_get_img_date_no_exif():
+    img = Mock()
+    img.getexif = Mock(side_effect = AttributeError)
+    exif = get_img_date(img)
+    eq_(exif, None)
 
 @patch('server.remove')
 def test_delete(remove):
@@ -114,19 +120,13 @@ def test_autolink_posts():
 def test_resize_image():
 
     img = Image.new('RGBA', size = (1600, 1200))
-    resized = resize_image(img, {})
+    resized = resize_image(img)
     assert len(resized) == 4
     assert resized[0].size == (320, 240)
     assert resized[1].size == (640, 480)
     assert resized[2].size == (960, 720)
     assert resized[3].size == (1280, 960)
 
-    resized = resize_image(img, { 'Orientation': 6 })
-    assert len(resized) == 4
-    assert resized[0].size == (240, 320)
-    assert resized[1].size == (480, 640)
-    assert resized[2].size == (720, 960)
-    assert resized[3].size == (960, 1280)
 
 def test_create_image_tag():
 
@@ -151,11 +151,11 @@ def test_create_image_tag():
     upload_files = DEFAULT,
     delete = DEFAULT,
     resize_image = DEFAULT,
-    get_img_data = DEFAULT,
+    get_img_date = DEFAULT,
 )
 def test_process_image(
     Image_open,
-    get_img_data,
+    get_img_date,
     resize_image,
     delete,
     upload_files,
@@ -164,7 +164,7 @@ def test_process_image(
 
     # Setup
 
-    get_img_data.return_value = { 'DateTime': '2017:05:05 13:21:05' }
+    get_img_date.return_value = '2017-05-05'
 
     resized = [
         Mock(size = (150, 100)),
