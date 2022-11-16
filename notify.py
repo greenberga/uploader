@@ -62,11 +62,6 @@ def send_update(recipient, new_count):
                         'email': address,
                     },
                 ],
-                'bcc': [
-                    {
-                        'email': config['notify-bcc'],
-                    },
-                ],
                 'subject': 'New photos on {}'.format(config['domain']),
             }
         ],
@@ -88,6 +83,13 @@ def send_update(recipient, new_count):
             },
         ],
     }
+
+    if 'bcc' in recipient or 'notify-bcc' in config:
+        data['personalizations'][0]['bcc'] = [
+            {
+                'email': recipient.get('bcc', config['notify-bcc']),
+            },
+        ]
 
     print('Sending update to %s' % address)
 
