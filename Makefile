@@ -9,4 +9,4 @@ docker-image:
 run-docker:
 	docker run --rm -it -v $(PWD):/app -w /app -p 5000:5000 uploader:$(DOCKERIMAGE)
 
-.PHONY: docker-image
+.PHONY: docker-image run-docker
