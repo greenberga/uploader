@@ -156,7 +156,7 @@ def resize_image(img):
     larger_dimension = width if width > height else height
     scales = [ x / larger_dimension for x in [ 320.0, 640.0, 960.0, 1280.0 ] ]
     new_sizes = [ (round(width * s), round(height * s)) for s in scales ]
-    return [ img.resize(size, Image.LANCZOS) for size in new_sizes ]
+    return [ img.resize(size, Image.Resampling.LANCZOS) for size in new_sizes ]
 
 
 def create_img_tag(oid, widths, summary):
