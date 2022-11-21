@@ -84,10 +84,16 @@ def send_update(recipient, new_count):
         ],
     }
 
-    if 'bcc' in recipient or 'notify-bcc' in config:
+    bcc_email = None
+    if 'bcc' in recipient:
+        bcc_email = recipient['bcc']
+    elif 'notify-bcc' in config:
+        bcc_email = config['notify-bcc']
+
+    if bcc_email:
         data['personalizations'][0]['bcc'] = [
             {
-                'email': recipient.get('bcc', config['notify-bcc']),
+                'email': bcc_email,
             },
         ]
 
