@@ -8,12 +8,13 @@ DRY = environ.get('DRY')
 
 UPLOADER_DIR = path.dirname(path.realpath(__file__))
 
-mode = environ.get('MODE', 'prod')
+MODE = environ.get('MODE', 'prod')
 config = ConfigParser()
 config.read(path.join(UPLOADER_DIR, 'config.ini'))
-config = config[mode]
+if not config.has_section(MODE):
+    raise ValueError('Missing config section for mode: ' + MODE)
 
-blog_path = config.get('blog-path', path.join(UPLOADER_DIR, 'blog'))
+blog_path = config.get(MODE, 'blog-path', fallback=path.join(UPLOADER_DIR, 'blog'))
 
 def compute_new_post_count():
 
@@ -62,15 +63,15 @@ def send_update(recipient, new_count):
                         'email': address,
                     },
                 ],
-                'subject': 'New photos on {}'.format(config['domain']),
+                'subject': 'New photos on {}'.format(config.get(MODE, 'domain')),
             }
         ],
         'from': {
-            'email': config['notify-from'],
-            'name': config['notify-name'],
+            'email': config.get(MODE, 'notify-from'),
+            'name': config.get(MODE, 'notify-name'),
         },
         'reply_to': {
-            'email': config['notify-reply-to'],
+            'email': config.get(MODE, 'notify-reply-to'),
         },
         'content': [
             {
@@ -87,8 +88,8 @@ def send_update(recipient, new_count):
     bcc_email = None
     if 'bcc' in recipient:
         bcc_email = recipient['bcc']
-    elif 'notify-bcc' in config:
-        bcc_email = config['notify-bcc']
+    elif 'notify-bcc' in config[MODE]:
+        bcc_email = config.get(MODE, 'notify-bcc')
 
     if bcc_email:
         data['personalizations'][0]['bcc'] = [
@@ -101,10 +102,10 @@ def send_update(recipient, new_count):
 
     if not DRY:
         response = requests.post(
-            config['notify-url'],
+            config.get(MODE, 'notify-url'),
             headers = {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer {}'.format(config['sendgrid-key'])
+                'Authorization': 'Bearer {}'.format(config.get(MODE, 'sendgrid-key'))
             },
             json = data,
         )
