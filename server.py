@@ -122,6 +122,7 @@ def upload_files(*file_paths):
                     Key = file_name,
                     Body = f,
                     ACL = 'public-read',
+                    ContentType = 'image/jpeg',
                 )
 
 

@@ -109,6 +109,7 @@ class TestServer(unittest.TestCase):
                 'Bucket': 'aws.bucket',
                 'Key': os.path.basename(f),
                 'ACL': 'public-read',
+                'ContentType': 'image/jpeg',
             })
 
     def test_autolink_posts(self):
