@@ -68,7 +68,7 @@ class TestServer(unittest.TestCase):
         img = Mock()
         img.getexif = Mock(return_value = { 306: '2015:04:02' })
         d = get_img_date(img)
-        self.assertEqual(d, '2015-04-02')
+        self.assertEqual(d, '4/2/2015')
 
     def test_get_img_date_no_date(self):
         img = Mock()
@@ -141,12 +141,12 @@ class TestServer(unittest.TestCase):
 
         SPECS = [
             (
-                ( 777, [ 300, 500, 700, 900 ], '' ),
-                '<img src="{{ site.assets_url }}/777-500.jpg" srcset="{{ site.assets_url }}/777-300.jpg 300w, {{ site.assets_url }}/777-500.jpg 500w, {{ site.assets_url }}/777-700.jpg 700w, {{ site.assets_url }}/777-900.jpg 900w" sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" />',
+                ( 777, [ 300, 500, 700, 900 ], '', '5/24/2024' ),
+                '<img data-taken="5/24/2024" sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" src="{{ site.assets_url }}/777-500.jpg" srcset="{{ site.assets_url }}/777-300.jpg 300w, {{ site.assets_url }}/777-500.jpg 500w, {{ site.assets_url }}/777-700.jpg 700w, {{ site.assets_url }}/777-900.jpg 900w" />',
             ),
             (
-                ( 888, [ 200, 400, 600, 800 ], 'Summary' ),
-                '<img src="{{ site.assets_url }}/888-400.jpg" srcset="{{ site.assets_url }}/888-200.jpg 200w, {{ site.assets_url }}/888-400.jpg 400w, {{ site.assets_url }}/888-600.jpg 600w, {{ site.assets_url }}/888-800.jpg 800w" sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" alt="{{ page.summary }}" />',
+                ( 888, [ 200, 400, 600, 800 ], 'Summary', None ),
+                '<img alt="{{ page.summary }}" sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" src="{{ site.assets_url }}/888-400.jpg" srcset="{{ site.assets_url }}/888-200.jpg 200w, {{ site.assets_url }}/888-400.jpg 400w, {{ site.assets_url }}/888-600.jpg 600w, {{ site.assets_url }}/888-800.jpg 800w" />',
             ),
         ]
 
@@ -160,12 +160,10 @@ class TestServer(unittest.TestCase):
         upload_files = DEFAULT,
         delete = DEFAULT,
         resize_image = DEFAULT,
-        get_img_date = DEFAULT,
     )
     def test_process_image(
         self,
         Image_open,
-        get_img_date,
         resize_image,
         delete,
         upload_files,
@@ -173,8 +171,6 @@ class TestServer(unittest.TestCase):
     ):
 
         # Setup
-
-        get_img_date.return_value = '2017-05-05'
 
         resized = [
             Mock(size = (150, 100)),
@@ -218,7 +214,6 @@ class TestServer(unittest.TestCase):
         self.assertEqual(post_object, {
             'oid': 111,
             'summary': 'Hi hello',
-            'date': '2017-05-05',
             'og_image': '111-500.jpg',
             'content': '<img src="111.jpg" />',
         })
@@ -246,7 +241,9 @@ class TestServer(unittest.TestCase):
                     '',
                     '<p>',
                     '  <time>',
-                    '    <a href="/872">November 16, 1992</a>',
+                    '    <a href="/872">',
+                    '      {{ page.date | date: "%B %-d, %Y" }}',
+                    '    </a>',
                     '  </time>',
                     '  <a href="/872">',
                     '    <img src="872-1280.jpg" />',
@@ -271,7 +268,9 @@ class TestServer(unittest.TestCase):
                     '',
                     '<p>',
                     '  <time>',
-                    '    <a href="/431">January 31, 2004</a>',
+                    '    <a href="/431">',
+                    '      {{ page.date | date: "%B %-d, %Y" }}',
+                    '    </a>',
                     '  </time>',
                     '  <a href="/431">',
                     '    <img src="431-960.jpg" />',

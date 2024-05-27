@@ -93,7 +93,10 @@ def get_img_date(img):
         md = {}
 
     if 'DateTime' in md:
-        return md['DateTime'].split(' ')[0].replace(':', '-')
+        y, m, d = md['DateTime'].split(' ')[0].split(':')
+        m = m.lstrip('0')
+        d = d.lstrip('0')
+        return '/'.join([m, d, y])
 
 
 def delete(*paths):
@@ -160,10 +163,11 @@ def resize_image(img):
     return [ img.resize(size, Image.Resampling.LANCZOS) for size in new_sizes ]
 
 
-def create_img_tag(oid, widths, summary):
+def create_img_tag(oid, widths, summary, date):
     """
     Creates an HTML <img> tag for an image post. Uses the OID, widths, and
-    optional summary for the different components of the tag.
+    optional summary for the different components of the tag. The date can
+    present or None, and will be added to the image as a 'data-taken' attribute.
 
     Parameters
     ----------
@@ -171,6 +175,7 @@ def create_img_tag(oid, widths, summary):
     widths: A list of numbers representing each width of the image.
     summary: A summary image that, if truthy, will cause an "alt" attribute to
     be added to the tag.
+    date: A string date storing when the image was captured. Can be None.
 
     Returns
     -------
@@ -182,10 +187,12 @@ def create_img_tag(oid, widths, summary):
     # Use the second-to-smallest file (widths[1]) as the default.
     src = '%s/%d-%d.jpg' % (assets_url, oid, widths[1])
     srcset = [ '%s/%d-%d.jpg %dw' % (assets_url, oid, w, w) for w in widths ]
-    img_tag = '<img src="{0}" '.format(src)
-    img_tag += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
-    img_tag += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
+    img_tag = '<img '
     img_tag += 'alt="{{ page.summary }}" ' if summary else ''
+    img_tag += 'data-taken="{}" '.format(date) if date else ''
+    img_tag += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
+    img_tag += 'src="{0}" '.format(src)
+    img_tag += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
     img_tag += '/>'
 
     return img_tag
@@ -209,9 +216,7 @@ def process_image(post_object, img_obj):
 
     # Attempt to extract the date the image was captured from the metadata.
     # This must be done BEFORE the next step, which seems to remove EXIF data.
-    d = get_img_date(img)
-    if d is not None:
-        post_object['date'] = d
+    date = get_img_date(img)
 
     img = ImageOps.exif_transpose(img).convert('RGB')
 
@@ -239,7 +244,7 @@ def process_image(post_object, img_obj):
 
     # Use the largest of the resized images for the OpenGraph image meta tag.
     post_object['og_image'] = '%d-%d.jpg' % (oid, max(widths))
-    post_object['content'] = create_img_tag(oid, widths, post_object['summary'])
+    post_object['content'] = create_img_tag(oid, widths, post_object['summary'], date)
 
 
 def create_post(post_object):
@@ -257,15 +262,6 @@ def create_post(post_object):
 
     logging.info('Writing post #{0}'.format(oid))
 
-    today = datetime.date.today()
-
-    if 'date' in post_object:
-        date = datetime.datetime.strptime(post_object['date'], '%Y-%m-%d')
-    else:
-        date = today
-
-    date_str = '{d:%B} {d.day}, {d:%Y}'.format(d = date)
-
     lines = [
         '---',
         'layout: post',
@@ -280,7 +276,9 @@ def create_post(post_object):
         '',
         '<p>',
         '  <time>',
-        '    <a href="/%s">%s</a>' % (oid, date_str),
+        '    <a href="/%s">' % oid,
+        '      {{ page.date | date: "%B %-d, %Y" }}',
+        '    </a>',
         '  </time>',
         '  <a href="/%s">' % oid,
         '    %s' % post_object['content'],
@@ -296,7 +294,7 @@ def create_post(post_object):
 
     logging.debug(contents)
 
-    file_name = join(blog_path, '_posts/{0}-{1}.md'.format(str(today), oid))
+    file_name = join(blog_path, '_posts/{0}-{1}.md'.format(str(datetime.date.today()), oid))
     if not DRY:
         with open(file_name, 'w') as f:
             f.write(contents)
