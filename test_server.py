@@ -141,11 +141,11 @@ class TestServer(unittest.TestCase):
 
         SPECS = [
             (
-                ( 777, [ 300, 500, 700, 900 ], '', '5/24/2024' ),
-                '<img data-taken="5/24/2024" sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" src="{{ site.assets_url }}/777-500.jpg" srcset="{{ site.assets_url }}/777-300.jpg 300w, {{ site.assets_url }}/777-500.jpg 500w, {{ site.assets_url }}/777-700.jpg 700w, {{ site.assets_url }}/777-900.jpg 900w" />',
+                ( 777, [ 300, 500, 700, 900 ], '' ),
+                '<img sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" src="{{ site.assets_url }}/777-500.jpg" srcset="{{ site.assets_url }}/777-300.jpg 300w, {{ site.assets_url }}/777-500.jpg 500w, {{ site.assets_url }}/777-700.jpg 700w, {{ site.assets_url }}/777-900.jpg 900w" />',
             ),
             (
-                ( 888, [ 200, 400, 600, 800 ], 'Summary', None ),
+                ( 888, [ 200, 400, 600, 800 ], 'Summary' ),
                 '<img alt="{{ page.summary }}" sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" src="{{ site.assets_url }}/888-400.jpg" srcset="{{ site.assets_url }}/888-200.jpg 200w, {{ site.assets_url }}/888-400.jpg 400w, {{ site.assets_url }}/888-600.jpg 600w, {{ site.assets_url }}/888-800.jpg 800w" />',
             ),
         ]
@@ -227,7 +227,7 @@ class TestServer(unittest.TestCase):
             (
                 {
                     'oid': 872,
-                    'date': '1992-11-16',
+                    'taken': '11/16/1992',
                     'summary': 'Apples &amp; Bananas',
                     'og_image': '872-1280.jpg',
                     'content': '<img src="872-1280.jpg" />',
@@ -239,24 +239,27 @@ class TestServer(unittest.TestCase):
                     'og_image: 872-1280.jpg',
                     '---',
                     '',
-                    '<p>',
+                    '<div class="post">',
                     '  <time>',
                     '    <a href="/872">',
                     '      {{ page.date | date: "%B %-d, %Y" }}',
                     '    </a>',
                     '  </time>',
                     '  <a href="/872">',
-                    '    <img src="872-1280.jpg" />',
+                    '    <figure data-taken="11/16/1992">',
+                    '      <img src="872-1280.jpg" />',
+                    '    </figure>',
                     '  </a>',
-                    '  <span>Apples &amp; Bananas</span>',
-                    '</p>',
+                    '  <span>',
+                    '    Apples &amp; Bananas',
+                    '  </span>',
+                    '</div>',
                     '',
                 ])
             ),
             (
                 {
                     'oid': 431,
-                    'date': '2004-01-31',
                     'summary': '',
                     'content': '<img src="431-960.jpg" />',
                 },
@@ -266,16 +269,18 @@ class TestServer(unittest.TestCase):
                     "summary: 'Post #431'",
                     '---',
                     '',
-                    '<p>',
+                    '<div class="post">',
                     '  <time>',
                     '    <a href="/431">',
                     '      {{ page.date | date: "%B %-d, %Y" }}',
                     '    </a>',
                     '  </time>',
                     '  <a href="/431">',
-                    '    <img src="431-960.jpg" />',
+                    '    <figure>',
+                    '      <img src="431-960.jpg" />',
+                    '    </figure>',
                     '  </a>',
-                    '</p>',
+                    '</div>',
                     '',
                 ])
             ),

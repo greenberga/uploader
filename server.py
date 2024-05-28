@@ -163,11 +163,10 @@ def resize_image(img):
     return [ img.resize(size, Image.Resampling.LANCZOS) for size in new_sizes ]
 
 
-def create_img_tag(oid, widths, summary, date):
+def create_img_tag(oid, widths, summary):
     """
     Creates an HTML <img> tag for an image post. Uses the OID, widths, and
-    optional summary for the different components of the tag. The date can
-    present or None, and will be added to the image as a 'data-taken' attribute.
+    optional summary for the different components of the tag.
 
     Parameters
     ----------
@@ -175,7 +174,6 @@ def create_img_tag(oid, widths, summary, date):
     widths: A list of numbers representing each width of the image.
     summary: A summary image that, if truthy, will cause an "alt" attribute to
     be added to the tag.
-    date: A string date storing when the image was captured. Can be None.
 
     Returns
     -------
@@ -189,7 +187,6 @@ def create_img_tag(oid, widths, summary, date):
     srcset = [ '%s/%d-%d.jpg %dw' % (assets_url, oid, w, w) for w in widths ]
     img_tag = '<img '
     img_tag += 'alt="{{ page.summary }}" ' if summary else ''
-    img_tag += 'data-taken="{}" '.format(date) if date else ''
     img_tag += 'sizes="(min-width: 700px) 50vw, calc(100vw - 2rem)" '
     img_tag += 'src="{0}" '.format(src)
     img_tag += 'srcset="{0}, {1}, {2}, {3}" '.format(*srcset)
@@ -217,6 +214,8 @@ def process_image(post_object, img_obj):
     # Attempt to extract the date the image was captured from the metadata.
     # This must be done BEFORE the next step, which seems to remove EXIF data.
     date = get_img_date(img)
+    if date is not None:
+        post_object['taken'] = date
 
     img = ImageOps.exif_transpose(img).convert('RGB')
 
@@ -271,25 +270,36 @@ def create_post(post_object):
     if 'og_image' in post_object:
         lines.append('og_image: %s' % post_object['og_image'])
 
+    if 'taken' in post_object:
+        figure = '<figure data-taken="%s">' % post_object['taken']
+    else:
+        figure = '<figure>'
+
     lines.extend([
         '---',
         '',
-        '<p>',
+        '<div class="post">',
         '  <time>',
         '    <a href="/%s">' % oid,
         '      {{ page.date | date: "%B %-d, %Y" }}',
         '    </a>',
         '  </time>',
         '  <a href="/%s">' % oid,
-        '    %s' % post_object['content'],
+        '    %s' % figure,
+        '      %s' % post_object['content'],
+        '    </figure>',
         '  </a>',
     ])
 
     summary = post_object['summary']
     if summary:
-        lines.append('  <span>%s</span>' % autolink_posts(summary))
+        lines.extend([
+            '  <span>',
+            '    %s' % autolink_posts(summary),
+            '  </span>',
+        ])
 
-    lines.extend([ '</p>', '' ])
+    lines.extend([ '</div>', '' ])
     contents = '\n'.join(lines)
 
     logging.debug(contents)
