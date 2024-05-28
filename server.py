@@ -243,7 +243,7 @@ def process_image(post_object, img_obj):
 
     # Use the largest of the resized images for the OpenGraph image meta tag.
     post_object['og_image'] = '%d-%d.jpg' % (oid, max(widths))
-    post_object['content'] = create_img_tag(oid, widths, post_object['summary'], date)
+    post_object['content'] = create_img_tag(oid, widths, post_object['summary'])
 
 
 def create_post(post_object):
