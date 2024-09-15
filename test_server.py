@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 import os
 import unittest
@@ -68,7 +67,7 @@ class TestServer(unittest.TestCase):
         img = Mock()
         img.getexif = Mock(return_value = { 306: '2015:04:02' })
         d = get_img_date(img)
-        self.assertEqual(d, '4/2/2015')
+        self.assertEqual(d, 'April 2, 2015')
 
     def test_get_img_date_no_date(self):
         img = Mock()
@@ -227,7 +226,7 @@ class TestServer(unittest.TestCase):
             (
                 {
                     'oid': 872,
-                    'taken': '11/16/1992',
+                    'taken': 'November 16, 1992',
                     'summary': 'Apples &amp; Bananas',
                     'og_image': '872-1280.jpg',
                     'content': '<img src="872-1280.jpg" />',
@@ -237,23 +236,16 @@ class TestServer(unittest.TestCase):
                     'layout: post',
                     "summary: 'Apples &amp; Bananas'",
                     'og_image: 872-1280.jpg',
+                    'taken: November 16, 1992',
                     '---',
                     '',
-                    '<div class="post">',
-                    '  <time>',
-                    '    <a href="/872">',
-                    '      {{ page.date | date: "%B %-d, %Y" }}',
-                    '    </a>',
-                    '  </time>',
-                    '  <a href="/872">',
-                    '    <figure data-taken="11/16/1992">',
-                    '      <img src="872-1280.jpg" />',
-                    '    </figure>',
-                    '  </a>',
-                    '  <span>',
-                    '    Apples &amp; Bananas',
-                    '  </span>',
-                    '</div>',
+                    '<figure class="post" data-src="{{ site.assets_url }}/{{ page.og_image }}" data-sub-html="#caption-872">',
+                    '<img src="872-1280.jpg" />',
+                    '<figcaption id="caption-872">',
+                    '<time>{{ page.taken | default: page.date | date: "%B %-d, %Y" }}</time>',
+                    '<p>Apples &amp; Bananas</p>',
+                    '</figcaption>',
+                    '</figure>',
                     '',
                 ])
             ),
@@ -269,18 +261,12 @@ class TestServer(unittest.TestCase):
                     "summary: 'Post #431'",
                     '---',
                     '',
-                    '<div class="post">',
-                    '  <time>',
-                    '    <a href="/431">',
-                    '      {{ page.date | date: "%B %-d, %Y" }}',
-                    '    </a>',
-                    '  </time>',
-                    '  <a href="/431">',
-                    '    <figure>',
-                    '      <img src="431-960.jpg" />',
-                    '    </figure>',
-                    '  </a>',
-                    '</div>',
+                    '<figure class="post" data-src="{{ site.assets_url }}/{{ page.og_image }}" data-sub-html="#caption-431">',
+                    '<img src="431-960.jpg" />',
+                    '<figcaption id="caption-431">',
+                    '<time>{{ page.taken | default: page.date | date: "%B %-d, %Y" }}</time>',
+                    '</figcaption>',
+                    '</figure>',
                     '',
                 ])
             ),

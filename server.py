@@ -3,7 +3,6 @@ import hmac
 import html
 import logging
 import re
-import time
 from contextlib import contextmanager
 from configparser import ConfigParser
 from email.utils import parseaddr
@@ -93,10 +92,9 @@ def get_img_date(img):
         md = {}
 
     if 'DateTime' in md:
-        y, m, d = md['DateTime'].split(' ')[0].split(':')
-        m = m.lstrip('0')
-        d = d.lstrip('0')
-        return '/'.join([m, d, y])
+        ds = md['DateTime'].split(' ')[0].replace(':', '-')
+        dt = datetime.date.fromisoformat(ds)
+        return dt.strftime('%B %-d, %Y')
 
 
 def delete(*paths):
@@ -271,35 +269,22 @@ def create_post(post_object):
         lines.append('og_image: %s' % post_object['og_image'])
 
     if 'taken' in post_object:
-        figure = '<figure data-taken="%s">' % post_object['taken']
-    else:
-        figure = '<figure>'
+        lines.append('taken: %s' % post_object['taken'])
 
     lines.extend([
         '---',
         '',
-        '<div class="post">',
-        '  <time>',
-        '    <a href="/%s">' % oid,
-        '      {{ page.date | date: "%B %-d, %Y" }}',
-        '    </a>',
-        '  </time>',
-        '  <a href="/%s">' % oid,
-        '    %s' % figure,
-        '      %s' % post_object['content'],
-        '    </figure>',
-        '  </a>',
+        '<figure class="post" data-src="{{ site.assets_url }}/{{ page.og_image }}" data-sub-html="#caption-%s">' % oid,
+        post_object['content'],
+        '<figcaption id="caption-%s">' % oid,
+        '<time>{{ page.taken | default: page.date | date: "%B %-d, %Y" }}</time>',
     ])
 
     summary = post_object['summary']
     if summary:
-        lines.extend([
-            '  <span>',
-            '    %s' % autolink_posts(summary),
-            '  </span>',
-        ])
+        lines.append('<p>%s</p>' % autolink_posts(summary))
 
-    lines.extend([ '</div>', '' ])
+    lines.extend([ '</figcaption>', '</figure>', '' ])
     contents = '\n'.join(lines)
 
     logging.debug(contents)
