@@ -56,33 +56,11 @@ def send_update(recipient, new_count):
     )
 
     data = {
-        'personalizations': [
-            {
-                'to': [
-                    {
-                        'email': address,
-                    },
-                ],
-                'subject': 'New photos on {}'.format(config.get(MODE, 'domain')),
-            }
-        ],
-        'from': {
-            'email': config.get(MODE, 'notify-from'),
-            'name': config.get(MODE, 'notify-name'),
-        },
-        'reply_to': {
-            'email': config.get(MODE, 'notify-reply-to'),
-        },
-        'content': [
-            {
-                'type': 'text/plain',
-                'value': text_content,
-            },
-            {
-                'type': 'text/html',
-                'value': html_content,
-            },
-        ],
+        'to': [address],
+        'subject':'New photos on {}'.format(config.get(MODE, 'domain')),
+        'from': config.get(MODE, 'notify-name') + ' ' + config.get(MODE, 'notify-from'),
+        'text': text_content,
+        'html': html_content,
     }
 
     bcc_email = None
@@ -100,16 +78,16 @@ def send_update(recipient, new_count):
 
     print('Sending update to %s' % address)
 
-    if not DRY:
-        response = requests.post(
-            config.get(MODE, 'notify-url'),
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer {}'.format(config.get(MODE, 'sendgrid-key'))
-            },
-            json = data,
-        )
-        response.raise_for_status()
+    if DRY:
+        # For dry run, send the HTTP request, but make it test-mode so it doesn't send the email.
+        data["o:testmode"] = 'true'
+
+    response = requests.post(
+        config.get(MODE, 'notify-url'),
+        auth = ("api", config.get(MODE, 'sendgrid-key')),
+        data = data,
+    )
+    response.raise_for_status()
 
 if __name__ == '__main__':
 
