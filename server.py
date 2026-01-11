@@ -1,8 +1,10 @@
 import datetime
 import hmac
 import html
+import json
 import logging
 import re
+import requests
 import time
 from contextlib import contextmanager
 from configparser import ConfigParser
@@ -15,6 +17,7 @@ from bottle import abort, post, request, run
 from git import Repo
 from PIL import Image, ImageOps
 from PIL.ExifTags import TAGS as EXIF_TAGS
+
 
 uploader_dirpath = dirname(realpath(__file__))
 rel = lambda f: join(uploader_dirpath, f)
@@ -38,6 +41,8 @@ logging.basicConfig(
     level = logging.DEBUG if DRY else logging.INFO,
 )
 
+MAILGUN_AUTH = ( 'api', config['mailgun-key'] )
+
 S3 = boto3.client(
     's3',
     aws_access_key_id = config['aws-access-key-id'],
@@ -57,6 +62,45 @@ def is_authorized(request):
     user_authorized = hmac.compare_digest(request.auth[0], config['sendgrid-user'])
     pass_authorized = hmac.compare_digest(request.auth[1], config['sendgrid-pass'])
     return sender_authorized and user_authorized and pass_authorized
+
+
+def download_attachments(attachments):
+    """
+    Downloads a media attachment from Mailgun.
+
+    Parameters
+    ----------
+    attachments: A string of attachments JSON data from a Mailgun request.
+
+    Returns
+    -------
+    A tuple containing
+    (1) A path to where the attachment is saved on disk.
+    (2) A mimetype string for the attachment file.
+    """
+
+    # Attempt to parse the attachment from the request form.
+    attachment = json.loads(attachments)[0]
+    url = attachment['url']
+    name = attachment['name']
+    content_type = attachment['content-type']
+
+    # Currently only images are valid.
+    # TODO: Eventually, if other file types (or no files) are supported,
+    # this check should be made more robust.
+    if not content_type.startswith('image'):
+        raise ValueError("Unsupported file type '%s'" % content_type)
+
+    # SIDE EFFECT: Download the parsed attachment to a temporary location.
+    save_path = join(TEMP_PATH, name)
+    response = requests.get(url, auth = MAILGUN_AUTH, stream = True)
+    response.raise_for_status()
+
+    with open(save_path, 'wb') as f:
+        for chunk in response:
+            f.write(chunk)
+
+    return save_path, content_type
 
 
 def get_new_oid():
@@ -345,9 +389,12 @@ def upload():
         summary = request.params.get('subject', '')
         post_object['summary'] = html.escape(summary)
 
-        file_object = request.files.attachment1.file
+        # logging.info(request.files.attachment1)
+        # file_object = request.files.attachment1
+        fpath, ftype = download_attachments(request.forms.get('attachments'))
+        print(fpath, ftype)
 
-        process_image(post_object, file_object)
+        process_image(post_object, fpath)
 
         create_post(post_object)
 
